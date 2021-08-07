@@ -34,15 +34,15 @@ CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUserna
     <dt><code>endpointHost</code></dt>
     <dd>The hostname (such as the IP address or FQDN) of the endpoint.</dd>
     <dt><code>endpointUsername</code></dt>
-    <dd>The username of an account on the endpoint with the Admin role. The factory default for Cisco endpoints is `admin`.</dd>
+    <dd>The username of an account on the endpoint with the Admin role. The factory default for Cisco endpoints is <code>admin</code>.</dd>
     <dt><code>endpointPassword</code></dt>
-    <dd>The passphrase used to log in to the user above. The factory default for Cisco endpoints is `CISCO`.</dd>
+    <dd>The passphrase used to log in to the user above. The factory default for Cisco endpoints is <code>CISCO</code>.</dd>
 </dl>
 
 <a id="example"></a>
 ### Example
 ```bat
-"C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.exe "C:\ProgramData\certify\assets\myendpoint.mycompany.com\20210817_abcdefgh.pfx" 192.168.1.100 admin CISCO
+"C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.exe" "C:\ProgramData\certify\assets\myendpoint.mycompany.com\20210817_abcdefgh.pfx" 192.168.1.100 admin CISCO
 ```
 
 <a id="lets-encrypt"></a>
@@ -56,10 +56,10 @@ You can use this program to automatically maintain valid certificates issued by 
 You can use [Certify The Web](https://certifytheweb.com) on a Windows computer to automatically renew certificates and deploy them with this program.
 
 1. [Download](https://certifytheweb.com/home/download) and install Certify The Web.
-1. Click **New Certificate**.
+1. Click `New Certificate`.
 1. Register your email address with Let's Encrypt.
 1. In the **Certificate** tab, add a domain like `myendpoint.mycompany.com` to the certificate, then click the `+` button.
-1. In the **Authorization** tab, change the **Challenge Type** to `dns-01`, select your DNS provider from the **DNS Update Method** list, and supply the **Credentials** for your DNS provider with the **New** button.
+1. In the **Authorization** tab, change the **Challenge Type** to **dns-01**, select your DNS provider from the **DNS Update Method** list, and supply the **Credentials** for your DNS provider with the `New` button.
 1. In the Deployment tab, set the Deployment Mode to **No Deployment**, since this is only used for local IIS servers.
 1. In the Tasks tab, add a new Deployment Task and choose **Run Powershell Script** and set the following properties.
     |Name|Value|
@@ -76,5 +76,5 @@ You can use [Certify The Web](https://certifytheweb.com) on a Windows computer t
     |Script Timeout Mins.||
     |Launch New Process|☐|
 1. Save the certificate.
-1. Optionally ensure the domain validation is working using the **Test** button.
-1. Request and deploy a certificate using the **Request certificate** button.
+1. Optionally ensure the domain validation is working using the `Test` button.
+1. Request and deploy a certificate using the `Request certificate` button.
