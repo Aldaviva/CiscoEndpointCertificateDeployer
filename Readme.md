@@ -69,7 +69,7 @@ You can use [Certify The Web](https://certifytheweb.com) on a Windows computer t
     |Trigger|Run On Success|
     |Run task even if previous task step failed|☐|
     |Authentication|Local (as current service user)|
-    |Program/Script|*The absolute path to the PowerShell script included with this program, such as* `C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.ps1`|
+    |Program/Script|*The absolute path to the [PowerShell script](https://github.com/Aldaviva/CiscoEndpointCertificateDeployer/blob/master/CiscoEndpointCertificateDeployer/CiscoEndpointCertificateDeployer.ps1) included with this program, such as* `C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.ps1`|
     |Pass Result as First Arg|☑|
     |Impersonation LogonType|Service|
     |Arguments|*Details about your endpoint, such as* `endpointHostname=myendpoint.mycompany.com;endpointUsername=admin;endpointPassword=CISCO`|
