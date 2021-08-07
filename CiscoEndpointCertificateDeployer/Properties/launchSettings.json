@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "CiscoEndpointCertificateDeployer": {
+      "commandName": "Project"
+    }
+  }
+}
