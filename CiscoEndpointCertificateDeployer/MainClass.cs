@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -10,7 +9,8 @@ namespace CiscoEndpointCertificateDeployer {
 
         private static async Task Main(string[] args) {
             if (args.Length < 4) {
-                string selfExeFilename = Path.GetFileName(Process.GetCurrentProcess().MainModule!.FileName)!;
+
+                string selfExeFilename = Process.GetCurrentProcess().ProcessName; //Assembly.GetCallingAssembly().Location fails for single-file EXE deployments
                 Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO");
                 return;
             }
@@ -25,10 +25,6 @@ namespace CiscoEndpointCertificateDeployer {
         }
 
         private static async Task deploy(string pfxFilename, Endpoint endpoint) {
-            (string pemContents, string fingerprintSha1) = CertificateService.convertPfxChainFileToPem(pfxFilename);
-            // await File.WriteAllTextAsync(Path.ChangeExtension(pfxFilename, "pem"), pemContents);
-            Console.WriteLine($"fingerprint (SHA-1): {fingerprintSha1}");
-
             Deployer deployer = new CeDeployer(endpoint);
             try {
 
@@ -45,8 +41,13 @@ namespace CiscoEndpointCertificateDeployer {
                     return;
                 }
 
+                (string pemContents, string fingerprintSha1) = CertificateService.convertPfxChainFileToPem(pfxFilename);
+                // await File.WriteAllTextAsync(Path.ChangeExtension(pfxFilename, "pem"), pemContents);
+                Console.WriteLine($"fingerprint (SHA-1): {fingerprintSha1}");
+
                 await deployer.uploadCertificate(pemContents);
                 await deployer.activateCertificate(fingerprintSha1, ServicePurpose.HTTPS);
+                //TODO delete expired certificates
                 await deployer.restartWebServer();
 
             } finally {

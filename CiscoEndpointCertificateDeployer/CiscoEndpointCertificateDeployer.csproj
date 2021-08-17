@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ApplicationIcon>cisco.ico</ApplicationIcon>
+    <Copyright>© 2021 Ben Hutchison</Copyright>
+    <Authors>Ben Hutchison</Authors>
+    <Company>Ben Hutchison</Company>
+    <Product>Cisco Endpoint Certificate Deployer</Product>
   </PropertyGroup>
 
   <ItemGroup>

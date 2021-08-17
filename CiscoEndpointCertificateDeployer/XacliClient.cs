@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Threading.Tasks;
 using Renci.SshNet;
 using Renci.SshNet.Common;
@@ -21,7 +22,7 @@ namespace CiscoEndpointCertificateDeployer {
             this.endpoint = endpoint;
         }
 
-        public async Task logIn() {
+        public void logIn() {
             if (disposed) {
                 throw new ObjectDisposedException("XacliClient instance has already been disposed and cannot be reused.");
             }
@@ -36,22 +37,33 @@ namespace CiscoEndpointCertificateDeployer {
             sshClient = new SshClient(keyboardInteractiveConnectionInfo);
             sshClient.Connect();
 
-            shell = sshClient.CreateShellStream("", 80, 24, 80, 24, 1024);
-            await waitForOkResponse(); //wait for login OK
+            shell              =  sshClient.CreateShellStream("", 80, 24, 80, 24, 1024);
+            shell.DataReceived += (_, args) => Console.WriteLine(Encoding.UTF8.GetString(args.Data).Replace("\r", "[\\r]").Replace("\n", "[\\n]"));
+            waitForOkResponse(); //wait for login OK
         }
 
         public void writeLine(string line) {
             ensureLoggedInAndNotDisposed();
+            Console.WriteLine(line);
             shell.WriteLine(line);
         }
 
-        public async Task<string> waitForOkResponse() {
-            return await expect(XACLI_OK);
+        public string waitForOkResponse() {
+            return expect(XACLI_OK);
         }
 
-        private async Task<string> expect(string expectation, Action<string>? onExpectationFulfilled = default) {
+        private string expect(string expectation) {
             ensureLoggedInAndNotDisposed();
-            return await Task.Factory.FromAsync((actions, callback, o) => shell.BeginExpect(callback, o, actions), result => shell.EndExpect(result),
+            return shell.Expect(expectation);
+        }
+
+        /// <summary>Deadlocks for some reason. Seems undocumented and untested.</summary>
+        [Obsolete]
+        private Task<string> expectAsync(string expectation, Action<string>? onExpectationFulfilled = default) {
+            ensureLoggedInAndNotDisposed();
+            onExpectationFulfilled ??= _ => { };
+            // Console.WriteLine($"Waiting for {expectation.Trim()}");
+            return Task.Factory.FromAsync((actions, callback, o) => shell.BeginExpect(callback, o, actions), result => shell.EndExpect(result),
                 new[] { new ExpectAction(expectation, onExpectationFulfilled) }, null);
         }
 

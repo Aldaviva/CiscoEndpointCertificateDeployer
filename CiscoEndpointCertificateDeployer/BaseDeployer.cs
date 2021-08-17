@@ -48,7 +48,7 @@ namespace CiscoEndpointCertificateDeployer {
             ensureLoggedInAndNotDisposed();
 
             using XacliClient xacliClient = new(endpoint);
-            await xacliClient.logIn();
+            xacliClient.logIn();
 
             Console.WriteLine("turning off HTTP");
             xacliClient.writeLine(createWebServerEnabledCommandString(false)); //takes about 3.5 seconds to take effect, including the socketexception
@@ -75,6 +75,8 @@ namespace CiscoEndpointCertificateDeployer {
             Console.WriteLine("turning on HTTP");
             xacliClient.writeLine(createWebServerEnabledCommandString(true)); //could get and remember the old value
             Console.WriteLine(xacliClient.waitForOkResponse());
+
+            xacliClient.writeLine("bye");
         }
 
         private string createWebServerEnabledCommandString(bool enable) {
