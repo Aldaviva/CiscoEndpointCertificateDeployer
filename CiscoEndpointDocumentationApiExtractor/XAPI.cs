@@ -83,6 +83,7 @@ namespace CiscoEndpointDocumentationApiExtractor {
         public int? arrayIndexItemParameterPosition { get; set; }
         public ICollection<IntRange> ranges { get; set; } = new List<IntRange>();
         public override DataType type => DataType.INTEGER;
+        public string? namePrefix { get; set; }
 
     }
 
@@ -143,6 +144,8 @@ namespace CiscoEndpointDocumentationApiExtractor {
 
         public int minimum { get; set; }
         public int maximum { get; set; }
+        public string? description { get; set; }
+        public ISet<Product> appliesTo { get; set; } = new HashSet<Product>();
 
     }
 
