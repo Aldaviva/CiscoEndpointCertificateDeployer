@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="morelinq" Version="3.3.2" />
-    <PackageReference Include="PdfPig" Version="0.1.4" />
+    <PackageReference Include="PdfPig" Version="0.1.5" />
   </ItemGroup>
 
 </Project>

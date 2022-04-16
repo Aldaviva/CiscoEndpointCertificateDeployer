@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace CiscoEndpointDocumentationApiExtractor {
 
@@ -87,7 +86,7 @@ namespace CiscoEndpointDocumentationApiExtractor {
 
     }
 
-    internal class EnumParameter: Parameter {
+    internal class EnumParameter: Parameter, EnumValues {
 
         public ISet<EnumValue> possibleValues { get; set; } = default!;
         public override DataType type => DataType.ENUM;
@@ -118,27 +117,54 @@ namespace CiscoEndpointDocumentationApiExtractor {
 
     }
 
-    internal class ValueSpace { }
+    /*
+     internal abstract class ValueSpace { }
 
     internal abstract class ValueSpace<T>: ValueSpace {
 
-        public DataType type { get; set; }
+        public abstract DataType type { get; }
+
+    }*/
+
+    internal abstract class ValueSpace {
+
+        public abstract DataType type { get; }
+        public string? description { get; set; }
 
     }
 
-    internal class IntValueSpace: ValueSpace<int> {
+    internal class IntValueSpace: ValueSpace {
 
         public ICollection<IntRange> ranges = new List<IntRange>();
+        public override DataType type => DataType.INTEGER;
+
+        /// <summary>
+        /// How the null value for this int valuespace is serialized.
+        /// For example, xStatus Network [n] VLAN Voice VlanId returns an integer in the range [1, 4094], or the string "Off" if the VLAN Voice Mode is not enabled.
+        /// If set, this string will get translated to null when reading this status. In most cases, this property should be null.
+        /// </summary>
+        public string? optionalValue { get; set; }
 
     }
 
-    internal class EnumValueSpace: ValueSpace<Enum> {
+    internal interface EnumValues {
+
+        ISet<EnumValue> possibleValues { get; set; }
+
+    }
+
+    internal class EnumValueSpace: ValueSpace, EnumValues {
 
         public ISet<EnumValue> possibleValues { get; set; } = default!;
+        public override DataType type => DataType.ENUM;
 
     }
 
-    internal class StringValueSpace: ValueSpace<string> { }
+    internal class StringValueSpace: ValueSpace {
+
+        public override DataType type => DataType.STRING;
+
+    }
 
     internal class IntRange {
 
