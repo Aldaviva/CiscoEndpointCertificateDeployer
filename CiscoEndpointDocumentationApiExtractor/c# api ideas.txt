@@ -1,0 +1,21 @@
+XApi xApi = new XApi("192.168.1.100", "admin", "CISCO")
+xApi.httpClient = new HttpClient(new SocketsHttpHandler());
+
+DialResponse response = await xApi.command.call.dial(number: "10990@bjn.vc", protocol: Protocol.SIP);
+
+await xApi.configuration.sip.proxy1Address("thor.aldaviva.com");
+string proxy1Address = await xApi.configuration.sip.proxy1Address();
+await xApi.configuration.fetch();
+
+SipRegistrationStatus status = (await xApi.status.fetch()).sip.registration.status;
+SipRegistrationStatus status = await xApi.status.sip.registration.status.fetch();
+
+extra functionality
+- start session
+- end session
+- bookings put xml
+- restart web server
+
+duplicate statuses
+	xStatus Video Output Connector [n] Connected (they just documented the same method twice, not a parser bug)
+	xStatus MediaChannels DirectShare [n] Channel [n] Netstat LastIntervalReceived (they just documented the same method twice, not a parser bug)

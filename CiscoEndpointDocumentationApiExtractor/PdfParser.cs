@@ -23,11 +23,30 @@ public static class PdfParser {
         try {
             const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\collaboration-endpoint-software-api-reference-guide-ce915.pdf";
 
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            XAPI      xapi      = parsePdf(PDF_FILENAME);
+            Stopwatch              stopwatch = Stopwatch.StartNew();
+            ExtractedDocumentation xapi      = parsePdf(PDF_FILENAME);
             Console.WriteLine($"Parsed PDF in {stopwatch.Elapsed:g}");
 
-            foreach (XConfiguration command in xapi.commands.Concat(xapi.configurations)) {
+            IEnumerable<IGrouping<string, AbstractCommand>> duplicates = xapi.statuses
+                .Concat<AbstractCommand>(xapi.configurations)
+                .Concat(xapi.commands)
+                .GroupBy(command => string.Join(' ', command.name.Skip(1)))
+                .Where(grouping => grouping.Count() > 1);
+
+            foreach (IGrouping<string, AbstractCommand> duplicate in duplicates) {
+                foreach (AbstractCommand command in duplicate) {
+                    Console.WriteLine(string.Join(' ', command.name));
+                }
+
+                Console.WriteLine();
+            }
+
+            // foreach (AbstractCommand command in ) {
+            //     string name = ;
+            //
+            // }
+
+            /*foreach (DocXConfiguration command in xapi.commands.Concat(xapi.configurations)) {
                 Console.WriteLine($@"
 {command.GetType().Name} {string.Join(' ', command.name)}
     Applies to: {string.Join(", ", command.appliesTo)}
@@ -68,7 +87,7 @@ public static class PdfParser {
                 }
             }
 
-            foreach (XStatus status in xapi.statuses) {
+            foreach (DocXStatus status in xapi.statuses) {
                 Console.WriteLine($@"
 {status.GetType().Name} {string.Join(' ', status.name)}
     Applies to: {string.Join(", ", status.appliesTo)}
@@ -92,7 +111,7 @@ public static class PdfParser {
                         Console.WriteLine($"       Enum - {string.Join('/', enumValueSpace.possibleValues.Select(value => value.name))}");
                         break;
                 }
-            }
+            }*/
 
         } catch (ParsingException e) {
             Letter firstLetter = e.word.Letters[0];
@@ -102,9 +121,9 @@ public static class PdfParser {
         }
     }
 
-    private static XAPI parsePdf(string filename) {
-        using PdfDocument pdf  = PdfDocument.Open(filename);
-        XAPI              xapi = new();
+    public static ExtractedDocumentation parsePdf(string filename) {
+        using PdfDocument      pdf  = PdfDocument.Open(filename);
+        ExtractedDocumentation xapi = new();
 
         parseSection(pdf, xapi.configurations);
         parseSection(pdf, xapi.commands);
@@ -116,13 +135,13 @@ public static class PdfParser {
     private static void parseSection<T>(PdfDocument pdf, ICollection<T> xapiDestinationCollection) where T: AbstractCommand, new() {
         string startBookmark, endBookmark;
 
-        if (typeof(T) == typeof(XConfiguration)) {
+        if (typeof(T) == typeof(DocXConfiguration)) {
             startBookmark = "xConfiguration commands";
             endBookmark   = "xCommand commands";
-        } else if (typeof(T) == typeof(XCommand)) {
+        } else if (typeof(T) == typeof(DocXCommand)) {
             startBookmark = "xCommand commands";
             endBookmark   = "xStatus commands";
-        } else if (typeof(T) == typeof(XStatus)) {
+        } else if (typeof(T) == typeof(DocXStatus)) {
             startBookmark = "xStatus commands";
             endBookmark   = "Appendices";
         } else {
@@ -170,7 +189,7 @@ public static class PdfParser {
 
             // Console.WriteLine($"Parsing {word.Text}\t(character style = {characterStyle}, parser state = {state})");
 
-            if (command is XStatus status && statusValueSpace is not null && characterStyle != CharacterStyle.VALUESPACE) {
+            if (command is DocXStatus status && statusValueSpace is not null && characterStyle != CharacterStyle.VALUESPACE) {
                 status.returnValueSpace = statusValueSpace switch {
                     "Integer" => new IntValueSpace(),
                     "String"  => new StringValueSpace(),
@@ -193,6 +212,15 @@ public static class PdfParser {
                 statusValueSpace = default;
             }
 
+            // Omit duplicate methods
+            // Sometimes Cisco documents the same exact method twice in the same PDF. Examples:
+            //     xStatus Video Output Connector [n] Connected
+            //     xStatus MediaChannels DirectShare [n] Channel [n] Netstat LastIntervalReceived
+            if (state == ParserState.METHOD_NAME_HEADING && characterStyle != CharacterStyle.METHOD_NAME_HEADING &&
+                xapiDestinationCollection.Any(cmd => cmd != command && cmd.name.Skip(1).SequenceEqual(command.name.Skip(1)))) {
+                xapiDestinationCollection.Remove(command);
+            }
+
             switch (characterStyle) {
                 case CharacterStyle.METHOD_FAMILY_HEADING:
                     //skip, not useful information, we'll get the method name from the METHOD_NAME_HEADING below
@@ -204,9 +232,9 @@ public static class PdfParser {
                     }
 
                     if (state != ParserState.VERSION_AND_PRODUCTS_COVERED_PREAMBLE && state != ParserState.METHOD_NAME_HEADING) {
-                        // finished last method, moving to next method
+                        // finished previous method, moving to next method
                         command = new T();
-                        xapiDestinationCollection.Add(command); //FIXME
+                        xapiDestinationCollection.Add(command);
                         resetMethodParsingState();
                     }
 
@@ -281,7 +309,7 @@ public static class PdfParser {
                     break;
                 case CharacterStyle.USAGE_EXAMPLE:
                     if (state == ParserState.USAGE_EXAMPLE) {
-                        if (command is XConfiguration xConfiguration && Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
+                        if (command is DocXConfiguration xConfiguration && Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
                             IntParameter indexParameter = new() {
                                 arrayIndexItemParameterPosition = parameterUsageIndex,
                                 required                        = true,
@@ -308,7 +336,7 @@ public static class PdfParser {
                             // otherwise it's an optional parameter like [Channel: Channel]
                             parameterUsageIndex++;
                             break;
-                        case ParserState.USAGE_PARAMETER_NAME or ParserState.VALUESPACE_TERM_DEFINITION when command is XConfiguration xConfiguration &&
+                        case ParserState.USAGE_PARAMETER_NAME or ParserState.VALUESPACE_TERM_DEFINITION when command is DocXConfiguration xConfiguration &&
                             xConfiguration.parameters.FirstOrDefault(p => word.Text == p.name + ':' && (p as IntParameter)?.arrayIndexItemParameterPosition is not null) is { } _positionalParam:
                             parameter = _positionalParam;
                             state     = ParserState.USAGE_PARAMETER_DESCRIPTION;
@@ -331,7 +359,7 @@ public static class PdfParser {
                     break;
                 case CharacterStyle.VALUESPACE:
                     switch (state) {
-                        case ParserState.VALUESPACE when command is XStatus:
+                        case ParserState.VALUESPACE when command is DocXStatus:
                             statusValueSpace = appendWord(statusValueSpace, word, previousWordBaseline);
                             break;
                         case ParserState.VALUESPACE or ParserState.USAGE_PARAMETER_VALUE_SPACE_APPLIES_TO:
@@ -448,7 +476,7 @@ public static class PdfParser {
 
                     break;
                 case CharacterStyle.VALUESPACE_TERM:
-                    if ((parameter as EnumValues ?? (command as XStatus)?.returnValueSpace as EnumValues) is { } enumValues) {
+                    if ((parameter as EnumValues ?? (command as DocXStatus)?.returnValueSpace as EnumValues) is { } enumValues) {
                         enumValue = enumValues.possibleValues.FirstOrDefault(value => value.name == word.Text.TrimEnd(':'));
                         state     = ParserState.VALUESPACE_TERM_DEFINITION;
                     } else if (parameter is not null) {
@@ -488,19 +516,19 @@ public static class PdfParser {
 
                             break;
                         case ParserState.VALUESPACE or ParserState.VALUESPACE_DESCRIPTION or ParserState.VALUESPACE_TERM_DEFINITION
-                            when isDifferentParagraph(word, previousWordBaseline) && word.Text == "Example:" && command is XStatus:
+                            when isDifferentParagraph(word, previousWordBaseline) && word.Text == "Example:" && command is DocXStatus:
                             state = ParserState.USAGE_EXAMPLE;
                             break;
                         case ParserState.USAGE_PARAMETER_DESCRIPTION or ParserState.USAGE_PARAMETER_VALUE_SPACE_APPLIES_TO or ParserState.VALUESPACE or ParserState
                                 .VALUESPACE_TERM_DEFINITION
-                            when isDifferentParagraph(word, previousWordBaseline) && command.GetType() == typeof(XConfiguration) && word.Text == "Default":
+                            when isDifferentParagraph(word, previousWordBaseline) && command.GetType() == typeof(DocXConfiguration) && word.Text == "Default":
 
                             state     = ParserState.USAGE_DEFAULT_VALUE_HEADING;
                             enumValue = null;
                             break;
                         case ParserState.USAGE_PARAMETER_DESCRIPTION or ParserState.USAGE_PARAMETER_VALUE_SPACE_APPLIES_TO or ParserState.VALUESPACE or ParserState
                                 .VALUESPACE_TERM_DEFINITION
-                            when isDifferentParagraph(word, previousWordBaseline) && command.GetType() == typeof(XConfiguration) && word.Text == "Range:" &&
+                            when isDifferentParagraph(word, previousWordBaseline) && command.GetType() == typeof(DocXConfiguration) && word.Text == "Range:" &&
                             parameter is IntParameter:
 
                             state = ParserState.VALUESPACE;
@@ -518,7 +546,7 @@ public static class PdfParser {
                             } else if (word.Text == ":" && state == ParserState.VALUESPACE) {
                                 //the colon after the parameter name, usually it's part of the word with PARAMETER_NAME character style but sometimes it's tokenized as a separate word
                                 //skip
-                            } else if (command is XStatus _status) {
+                            } else if (command is DocXStatus _status) {
                                 _status.returnValueSpace.description = appendWord(_status.returnValueSpace.description, word, previousWordBaseline);
                                 state                                = ParserState.VALUESPACE_DESCRIPTION;
                             } else {
@@ -557,7 +585,7 @@ public static class PdfParser {
 
                             break;
                         case ParserState.REQUIRES_USER_ROLE_ROLES or ParserState.DESCRIPTION:
-                            if (word.Text == "Value" && isDifferentParagraph(word, previousWordBaseline) && command is XStatus) {
+                            if (word.Text == "Value" && isDifferentParagraph(word, previousWordBaseline) && command is DocXStatus) {
                                 state = ParserState.DESCRIPTION_VALUE_SPACE_HEADING;
                             } else {
                                 state               = ParserState.DESCRIPTION;
@@ -565,7 +593,7 @@ public static class PdfParser {
                             }
 
                             break;
-                        case ParserState.DESCRIPTION_VALUE_SPACE_HEADING when command is XStatus && !isDifferentParagraph(word, previousWordBaseline):
+                        case ParserState.DESCRIPTION_VALUE_SPACE_HEADING when command is DocXStatus && !isDifferentParagraph(word, previousWordBaseline):
                             if (word.Text == "returned:") {
                                 state = ParserState.VALUESPACE;
                             } else if (!XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS.Contains(word.Text)) {
