@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Xml.Linq;
-using CiscoEndpointCertificateDeployer;
+using CiscoEndpointCertificateDeployer.Clients;
 using Xunit;
 
 namespace Tests {

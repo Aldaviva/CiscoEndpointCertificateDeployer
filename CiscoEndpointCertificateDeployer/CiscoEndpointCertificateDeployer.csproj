@@ -1,19 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <ApplicationIcon>cisco.ico</ApplicationIcon>
-    <Copyright>© 2021 Ben Hutchison</Copyright>
-    <Authors>Ben Hutchison</Authors>
-    <Company>Ben Hutchison</Company>
-    <Product>Cisco Endpoint Certificate Deployer</Product>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net7.0</TargetFramework>
+        <Version>1.0.1</Version>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+        <LangVersion>latest</LangVersion>
+        <RollForward>major</RollForward>
+        <ApplicationIcon>cisco.ico</ApplicationIcon>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <Authors>Ben Hutchison</Authors>
+        <Copyright>© 2023 Ben Hutchison</Copyright>
+        <Product>Cisco Endpoint Certificate Deployer</Product>
+        <Company>$(Authors)</Company>
+        <FileVersion>$(Version)</FileVersion>
+        <AssemblyVersion>$(Version)</AssemblyVersion>
+        <AssemblyTitle>$(Product)</AssemblyTitle>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="SSH.NET" Version="2020.0.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="SSH.NET" Version="2020.0.2" />
+    </ItemGroup>
 
 </Project>
