@@ -47,58 +47,6 @@ internal class TxasRequestContent: StreamContent {
 
 }
 
-/*public interface XAPI {
-
-    Security security { get; }
-
-}
-
-public interface Security {
-
-    SecurityCertificates certificates { get; }
-
-}
-
-public interface SecurityCertificates {
-
-    SecurityCertificatesServices services { get; }
-
-}
-
-public interface SecurityCertificatesServices {
-
-    Task add(string pemContents);
-
-}
-
-public class TXAS: XAPI, Security, SecurityCertificates, SecurityCertificatesServices {
-
-    public Security security => this;
-
-    public SecurityCertificates certificates => this;
-
-    public SecurityCertificatesServices services => this;
-
-    Task SecurityCertificatesServices.add(string pemContents) {
-        throw new NotImplementedException();
-    }
-
-}
-
-public class XACLI: XAPI, Security, SecurityCertificates, SecurityCertificatesServices {
-
-    public Security security => this;
-
-    public SecurityCertificates certificates => this;
-
-    public SecurityCertificatesServices services => this;
-
-    public Task add(string pemContents) {
-        throw new NotImplementedException();
-    }
-
-}*/
-
 public enum ServicePurpose {
 
     _8021X,

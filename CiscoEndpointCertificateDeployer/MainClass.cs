@@ -13,7 +13,7 @@ internal static class MainClass {
         if (args.Length < 4) {
 
             string selfExeFilename = Process.GetCurrentProcess().ProcessName; //Assembly.GetCallingAssembly().Location fails for single-file EXE deployments
-            Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO");
+            Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO https,sip");
             return;
         }
 
@@ -21,12 +21,14 @@ internal static class MainClass {
         string endpointHost     = args.ElementAt(1);
         string endpointUsername = args.ElementAt(2);
         string endpointPassword = args.ElementAt(3);
+        ISet<ServicePurpose> purposes = args.ElementAtOrDefault(4)?.Split(',').Select(split => Enum.Parse<ServicePurpose>(split, true)).ToHashSet()
+            ?? new HashSet<ServicePurpose> { ServicePurpose.HTTPS };
 
         Endpoint endpoint = new(endpointHost, endpointUsername, endpointPassword);
-        await deploy(pfxFilename, endpoint);
+        await deploy(pfxFilename, endpoint, purposes);
     }
 
-    private static async Task deploy(string pfxFilename, Endpoint endpoint) {
+    private static async Task deploy(string pfxFilename, Endpoint endpoint, IEnumerable<ServicePurpose> purposes) {
         Deployer deployer = new CeDeployer(endpoint);
         try {
 
@@ -48,7 +50,10 @@ internal static class MainClass {
             Console.WriteLine($"fingerprint (SHA-1): {fingerprintSha1}");
 
             await deployer.uploadCertificate(pemContents);
-            await deployer.activateCertificate(fingerprintSha1, ServicePurpose.HTTPS);
+            foreach (ServicePurpose purpose in purposes) {
+                await deployer.activateCertificate(fingerprintSha1, purpose);
+            }
+
             //TODO delete expired certificates
             await deployer.restartWebServer();
 
