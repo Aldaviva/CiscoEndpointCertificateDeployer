@@ -27,7 +27,7 @@ Automatically upload and activate PFX certificate and private key to a Cisco vid
 ## Usage
 
 ```bat
-CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUsername endpointPassword
+CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUsername endpointPassword applyToServices
 ```
 
 <dl>
@@ -39,12 +39,14 @@ CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUserna
     <dd>The username of an account on the endpoint with the Admin role. The factory default for Cisco endpoints is <code>admin</code>.</dd>
     <dt><code>endpointPassword</code></dt>
     <dd>The passphrase used to log in to the user above. The factory default for Cisco endpoints is the empty string.</dd>
+    <dt><code>applyToServices</code></dt>
+    <dd>A comma-delimited list of service names with which the new certificate will be used. Defaults to <code>https</code>, but you can include SIPS by passing <code>https,sip</code>.</dd>
 </dl>
 
 <a id="example"></a>
 ### Example
 ```bat
-"C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.exe" "C:\ProgramData\certify\assets\myendpoint.mycompany.com\20210817_abcdefgh.pfx" myendpoint.mycompany.com admin CISCO
+"C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.exe" "C:\ProgramData\certify\assets\myendpoint.mycompany.com\20210817_abcdefgh.pfx" myendpoint.mycompany.com admin CISCO https,sip
 ```
 
 <a id="lets-encrypt"></a>
@@ -74,7 +76,7 @@ You can use [Certify The Web](https://certifytheweb.com) on a Windows computer t
     |Program/Script|*The absolute path to the [PowerShell script](https://github.com/Aldaviva/CiscoEndpointCertificateDeployer/blob/master/CiscoEndpointCertificateDeployer/CiscoEndpointCertificateDeployer.ps1) included with this program, such as* `C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.ps1`|
     |Pass Result as First Arg|☑|
     |Impersonation LogonType|Service|
-    |Arguments|*Details about your endpoint, in the form* `endpointHostname=myendpoint.mycompany.com;endpointUsername=admin;endpointPassword=CISCO`|
+    |Arguments|*Details about your endpoint, in the form* `endpointHostname=myendpoint.mycompany.com;endpointUsername=admin;endpointPassword=CISCO;applyToServices=https,sip`|
     |Script Timeout Mins.||
     |Launch New Process|☐|
 1. Click the Save button.
