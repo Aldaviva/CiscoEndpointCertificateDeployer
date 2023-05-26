@@ -7,9 +7,9 @@ namespace CiscoEndpointCertificateDeployer.Clients;
 /// Documentation:
 ///     TC7: https://www.cisco.com/c/dam/en/us/td/docs/telepresence/endpoint/codec-c-series/tc7/api-reference-guide/codec-c60-c40-api-reference-guide-tc73.pdf
 /// </summary>
-public class TXAS {
+public static class TXAS {
 
-    private static readonly XAttribute COMMAND = new("command", "True");
+    private static readonly XAttribute COMMAND_ATTR = new("command", "True");
 
     public static XDocument createCommand(string command, IDictionary<string, string>? parameters = null) {
         return createCommand(command.Split(' '), parameters);
@@ -25,7 +25,8 @@ public class TXAS {
             return childEl;
         });
 
-        commandEl.Add(new object[] { COMMAND }.Concat(parameters?.Select(pair => new XElement(pair.Key, pair.Value)) ?? Enumerable.Empty<XElement>()).ToArray());
+        commandEl.Add(new object[] { COMMAND_ATTR }
+            .Concat(parameters?.Select(pair => new XElement(pair.Key, pair.Value)) ?? Enumerable.Empty<XElement>()).ToArray());
 
         return commandEl.Document!;
     }

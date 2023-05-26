@@ -1,8 +1,11 @@
 ﻿using System.Net;
 using System.Xml.Linq;
+using System.Xml.Serialization;
 using CiscoEndpointCertificateDeployer.Clients;
 using CiscoEndpointCertificateDeployer.Data;
+using CiscoEndpointCertificateDeployer.Data.Envelopes;
 using CiscoEndpointCertificateDeployer.Exceptions;
+using CiscoEndpointCertificateDeployer.Extensions;
 
 namespace CiscoEndpointCertificateDeployer.Deploy;
 
@@ -69,6 +72,38 @@ public class CeDeployer: BaseDeployer {
             Console.WriteLine($"Activated certificate {certificateFingerprintSha1}");
         } else {
             throw new CiscoException($"Failed to activate certificate: {await response.Content.ReadAsStringAsync()}");
+        }
+    }
+
+    public override async Task<IEnumerable<CiscoCertificate>> listCertificates() {
+        ensureLoggedInAndNotDisposed();
+
+        XDocument command = TXAS.createCommand(new[] { "Command", "Security", "Certificates", "Services", "Show" });
+
+        using HttpResponseMessage response = await httpClient.PostAsync(putXml(), new TxasRequestContent(command));
+
+        if (!response.IsSuccessStatusCode) {
+            throw new CiscoException("Failed to list certificates");
+        }
+
+        XDocument          doc         = await response.Content.ReadFromXmlAsync();
+        XElement           containerEl = doc.Descendants("ServicesShowResult").First();
+        ServicesShowResult container   = (ServicesShowResult) new XmlSerializer(typeof(ServicesShowResult)).Deserialize(containerEl.CreateReader())!;
+        return container.certificates;
+    }
+
+    public override async Task deleteCertificate(string certificateFingerprintSha1) {
+        ensureLoggedInAndNotDisposed();
+
+        XDocument command = TXAS.createCommand(new[] { "Command", "Security", "Certificates", "Services", "Delete" }, new Dictionary<string, string> {
+            { "Fingerprint", certificateFingerprintSha1.ToLowerInvariant() },
+        });
+
+        using HttpResponseMessage response = await httpClient.PostAsync(putXml(), new TxasRequestContent(command));
+        if (response.IsSuccessStatusCode) {
+            Console.WriteLine($"Deleted certificate {certificateFingerprintSha1}");
+        } else {
+            throw new CiscoException($"Failed to delete certificate: {await response.Content.ReadAsStringAsync()}");
         }
     }
 

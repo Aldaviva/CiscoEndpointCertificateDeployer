@@ -1,4 +1,5 @@
 ﻿using CiscoEndpointCertificateDeployer.Clients;
+using CiscoEndpointCertificateDeployer.Data;
 using CiscoEndpointCertificateDeployer.Exceptions;
 
 namespace CiscoEndpointCertificateDeployer.Deploy;
@@ -17,5 +18,9 @@ public interface Deployer: IDisposable {
     public Task activateCertificate(string certificateFingerprintSha1, ServicePurpose servicePurpose);
 
     public Task restartWebServer();
+
+    Task<IEnumerable<CiscoCertificate>> listCertificates();
+
+    Task deleteCertificate(string certificateFingerprintSha1);
 
 }

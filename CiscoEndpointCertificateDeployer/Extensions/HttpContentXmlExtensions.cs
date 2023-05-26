@@ -1,5 +1,7 @@
 ﻿using System.Xml.Linq;
 
+// ReSharper disable InconsistentNaming
+
 namespace CiscoEndpointCertificateDeployer.Extensions;
 
 public static class HttpContentXmlExtensions {

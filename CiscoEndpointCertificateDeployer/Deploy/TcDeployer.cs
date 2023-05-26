@@ -55,10 +55,7 @@ public partial class TcDeployer: BaseDeployer {
     public override async Task uploadCertificate(string pemCertificate) {
         ensureLoggedInAndNotDisposed();
 
-        HttpContent pemContent;
-        pemContent = new StringContent(pemCertificate, UTF8_SERIALIZING, "application/octet-stream");
-        // pemContent = new(Encoding.UTF8.GetBytes(pemCertificate));
-        // pemContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        HttpContent pemContent = new StringContent(pemCertificate, UTF8_SERIALIZING, "application/octet-stream");
 
         MultipartFormDataContent requestBody = new() {
             { pemContent, "certificate", "ciscocert.pem" },
@@ -93,6 +90,16 @@ public partial class TcDeployer: BaseDeployer {
         } else {
             throw new CiscoException("Failed to activate new certificate");
         }
+    }
+
+    public override Task<IEnumerable<CiscoCertificate>> listCertificates() {
+        // not implemented
+        return Task.FromResult(Enumerable.Empty<CiscoCertificate>());
+    }
+
+    public override Task deleteCertificate(string certificateFingerprintSha1) {
+        // not implemented
+        return Task.CompletedTask;
     }
 
 }

@@ -21,6 +21,8 @@ public abstract class BaseDeployer: Deployer {
     public abstract Task logIn();
     public abstract Task uploadCertificate(string   pemCertificate);
     public abstract Task activateCertificate(string certificateFingerprintSha1, ServicePurpose servicePurpose);
+    public abstract Task<IEnumerable<CiscoCertificate>> listCertificates();
+    public abstract Task deleteCertificate(string certificateFingerprintSha1);
 
     protected BaseDeployer(Endpoint endpoint) {
         this.endpoint   = endpoint;

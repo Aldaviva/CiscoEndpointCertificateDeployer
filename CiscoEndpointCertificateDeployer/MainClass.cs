@@ -11,7 +11,6 @@ internal static class MainClass {
 
     private static async Task Main(string[] args) {
         if (args.Length < 4) {
-
             string selfExeFilename = Process.GetCurrentProcess().ProcessName; //Assembly.GetCallingAssembly().Location fails for single-file EXE deployments
             Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO https,sip");
             return;
@@ -54,7 +53,12 @@ internal static class MainClass {
                 await deployer.activateCertificate(fingerprintSha1, purpose);
             }
 
-            //TODO delete expired certificates
+            IEnumerable<CiscoCertificate> certificatesToDelete = (await deployer.listCertificates())
+                .Where(cert => cert is { issuerName: "/C=US/O=Let's Encrypt/CN=R3", usedFor: "" });
+            foreach (CiscoCertificate certificateToDelete in certificatesToDelete) {
+                await deployer.deleteCertificate(certificateToDelete.fingerprint);
+            }
+
             await deployer.restartWebServer();
 
         } finally {
