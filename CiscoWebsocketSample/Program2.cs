@@ -8,7 +8,7 @@ public class Program2 {
     // private static readonly Random RANDOM = new();
 
     public static async Task Main() {
-        XApi xapi = new JsonRpcXapi("roomkit.aldaviva.com", "ben", "***REMOVED***", true) { ConsoleTracing = false };
+        XApi xapi = new JsonRpcXapi("roomkit.aldaviva.com", "ben", "password", true) { ConsoleTracing = false };
         await xapi.connect();
 
         int   secondsRemaining = 30;

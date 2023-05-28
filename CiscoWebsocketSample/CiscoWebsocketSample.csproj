@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="StreamJsonRpc" Version="2.11.35" />
+    <PackageReference Include="StreamJsonRpc" Version="2.15.29" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,8 +12,7 @@ public class Program1 {
         JsonSerializerOptions jsonOptions = new() { Converters = { new ObjectToInferredTypesConverter() } };
 
         using ClientWebSocket webSocket = new();
-// webSocket.Options.Credentials = new NetworkCredential("ben", "***REMOVED***");
-        webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("ben:***REMOVED***")));
+        webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("ben:password")));
         webSocket.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true; // allow self-signed certificates
 // webSocket.Options.Proxy                               = new WebProxy("127.0.0.1", 9998);
         // webSocket.Options.UseDefaultCredentials = true;
