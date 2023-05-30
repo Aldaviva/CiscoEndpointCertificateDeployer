@@ -1,84 +1,120 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using MoreLinq;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Util;
 
-// using BitMiracle.Docotic.Pdf;
-
-namespace CiscoEndpointDocumentationApiExtractor; 
+namespace CiscoEndpointDocumentationApiExtractor;
 
 internal class Program {
 
     private static void Main(string[] args) {
-        const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\collaboration-endpoint-software-api-reference-guide-ce915.pdf";
+        const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\api-reference-guide-roomos-111.pdf";
 
         using PdfDocument pdf = PdfDocument.Open(PDF_FILENAME);
 
-        Page page = pdf.GetPage(234);
+        Page page = pdf.GetPage(361);
 
-        IEnumerable<Word> pageText = page.GetWords();
+        IWordExtractor wordExtractor = DefaultWordExtractor.Instance;
+        IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
+            .Where(letter => isTextOnHalfOfPage(letter, page, false))
+            /*.Select(letter => letter switch {
+                { Value: "\"", PointSize: 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT") => new Letter(
+                    letter.Value,
+                    letter.GlyphRectangle,
+                    new PdfPoint(letter.StartBaseLine.X, Math.Round(letter.StartBaseLine.Y, 4)),
+                    new PdfPoint(letter.EndBaseLine.X, Math.Round(letter.EndBaseLine.Y, 4)),
+                    letter.Width,
+                    letter.FontSize,
+                    letter.Font,
+                    letter.Color,
+                    8.8,
+                    letter.TextSequence),
+                _ => letter
+            })*/.ToImmutableList();
+        IEnumerable<Word> pageText = wordExtractor.GetWords(lettersWithUnfuckedQuotationMarks);
 
-        foreach (Word textBlock in pageText.Where(data => isTextOnHalfOfPage(data, page, true))) {
+        // IComparer<Word> wordPositionComparer = new WordPositionComparer();
+        foreach (Word textBlock in pageText) {
             Letter firstLetter = textBlock.Letters[0];
-            Console.WriteLine($@"{textBlock.Text}
+            Console.WriteLine(textBlock.Text);
+            /*Console.WriteLine($@"{textBlock.Text}
     typeface = {firstLetter.Font.Name.Split('+', 2).Last()}
-    font size = {firstLetter.FontSize}
+    point size = {firstLetter.PointSize}
     italic = {firstLetter.Font.IsItalic}
     bold = {firstLetter.Font.IsBold}
     weight = {firstLetter.Font.Weight:N}
     position = ({firstLetter.Location.X:N}, {firstLetter.Location.Y:N})
-    baseline = {firstLetter.StartBaseLine.Y:N}
+    baseline = {firstLetter.StartBaseLine.Y:N3}
     bounds bottom = {textBlock.BoundingBox.Bottom:N}
     height (bounds) = {textBlock.BoundingBox.Height:N}
     height (transformed) = {firstLetter.PointSize:N}
     capline = {firstLetter.StartBaseLine.Y + textBlock.BoundingBox.Height:N}
     topline = {firstLetter.StartBaseLine.Y + firstLetter.PointSize:N}
     color = {firstLetter.Color}
-");
+    text sequence = {firstLetter.TextSequence:N0}
+");*/
         }
     }
 
-    /*private static void Main2(string[] args) {
-        const string PDF_FILENAME = @"c:\Users\Ben\Desktop\collaboration-endpoint-software-api-reference-guide-ce915.pdf";
+    internal static bool isTextOnHalfOfPage(Word word, Page page, bool isOnLeft) => isTextOnHalfOfPage(word.Letters[0], page, isOnLeft);
 
-        using PdfDocument pdf = new(PDF_FILENAME);
+    internal static bool isTextOnHalfOfPage(Letter letter, Page page, bool isOnLeft) {
 
-        PdfPage page = pdf.Pages[230 - 1];
-
-        PdfCollection<PdfTextData> pageText = page.GetWords();
-
-        foreach (PdfTextData textBlock in pageText.Where(data => isTextOnHalfOfPage(data, page, true))) {
-            Console.WriteLine($@"{textBlock.GetText()}
-typeface = {textBlock.Font.Name}
-font size = {textBlock.FontSize}
-underline = {textBlock.Font.Underline}
-italic = {textBlock.Font.Italic}
-bold = {textBlock.Font.Bold}
-position = ({textBlock.Position.X:N}, {textBlock.Position.Y:N})
-topsidebearing = {textBlock.Bounds.Top + textBlock.Font.TopSideBearing / 1000:N} //this seems like the closest we're going to get to a baseline
-bounds bottom = {textBlock.Bounds.Bottom:N}
-height (topsidebearing) = {textBlock.Font.TopSideBearing / 1000:N}
-height (boundings) = {textBlock.Bounds.Height:N}
-height (size) = {textBlock.Size.Height:N}
-height (transformed) = {textBlock.TransformationMatrix.M22 * textBlock.FontSize:N} //this is a nice point size value
-");
-        }
-    }*/
-
-    internal static bool isTextOnHalfOfPage(Word text, Page page, bool isOnLeft) {
         const int POINTS_PER_INCH = 72;
-        Letter    firstLetter     = text.Letters[0];
 
-        return firstLetter.Location.Y > POINTS_PER_INCH * 0.5
-            && firstLetter.Location.Y < page.Height - POINTS_PER_INCH * 1.25
-            && (firstLetter.Location.X < page.Width / 2) ^ !isOnLeft;
+        const double LEFT_MARGIN   = 5.0 / 8.0 * POINTS_PER_INCH;
+        const double TOP_MARGIN    = 1.0 * POINTS_PER_INCH;
+        const double BOTTOM_MARGIN = POINTS_PER_INCH * 0.5;
+
+        return letter.Location.Y > BOTTOM_MARGIN
+            && letter.Location.Y < page.Height - TOP_MARGIN
+            && (letter.Location.X < (page.Width - LEFT_MARGIN) / 2 + LEFT_MARGIN) ^ !isOnLeft
+            && letter.Location.X > LEFT_MARGIN;
     }
 
-    /*private static bool isTextOnHalfOfPage2(PdfTextData text, PdfPage page, bool isOnLeft) {
-        return text.Position.Y > page.Resolution * 1.25
-            && text.Position.Y < page.Height - page.Resolution * 0.5
-            && (text.Position.X < page.Width / 2) ^ !isOnLeft;
-    }*/
+}
+
+public class TextSequenceWordExtractor: IWordExtractor {
+
+    public IEnumerable<Word> GetWords2(IReadOnlyList<Letter> letters) =>
+        letters.GroupBy(letter => letter.TextSequence)
+            .SelectMany(grouping => grouping.Split(letter => string.IsNullOrWhiteSpace(letter.Value))
+                .Where(lettersInWord => lettersInWord.Any())
+                .Select(lettersInWord => new Word(lettersInWord.ToList())));
+
+    public IEnumerable<Word> GetWords(IReadOnlyList<Letter> letters) {
+        int? previousSequenceId = null;
+        var  currentWordLetters = new List<Letter>();
+
+        foreach (Letter letter in letters) {
+            bool isWhitespace = string.IsNullOrWhiteSpace(letter.Value);
+
+            bool startNewWord = /*isWhitespace ||*/
+                previousSequenceId.HasValue && previousSequenceId != letter.TextSequence &&
+                currentWordLetters is not [{ Value: "\"", PointSize: 9.6 }] &&
+                letter is not { Value: "\"", PointSize: 9.6 } /*||
+                (currentWordLetters.LastOrDefault() is { } previousLetter && Math.Abs(previousLetter.StartBaseLine.Y - letter.StartBaseLine.Y) > letter.GlyphRectangle.Height / 2)*/;
+
+            if (startNewWord && currentWordLetters.Any()) {
+                yield return new Word(currentWordLetters);
+                currentWordLetters.Clear();
+            }
+
+            if (!isWhitespace) {
+                currentWordLetters.Add(letter);
+            }
+
+            previousSequenceId = letter.TextSequence;
+        }
+
+        if (currentWordLetters.Any()) {
+            yield return new Word(currentWordLetters);
+        }
+
+    }
 
 }

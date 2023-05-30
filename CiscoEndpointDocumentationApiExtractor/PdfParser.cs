@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using MoreLinq;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Outline;
+using UglyToad.PdfPig.Util;
 
 namespace CiscoEndpointDocumentationApiExtractor;
 
@@ -14,14 +17,15 @@ public static class PdfParser {
 
     private const int DPI = 72;
 
-    private static readonly ISet<string> XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS = new HashSet<string> { "Value", "space", "of", "the", "result", "returned:" };
+    private static readonly ISet<string>   XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS = new HashSet<string> { "Value", "space", "of", "the", "result", "returned:" };
+    private static readonly IWordExtractor WORD_EXTRACTOR                                = DefaultWordExtractor.Instance;
 
     public static void Main() {
         // Console.WriteLine(string.Join("\n", guessEnumRange("Microphone.1/../Microphone.4/Line.1/Line.2/HDMI.2".Split('/')).Select(value => value.name)));
         // return;
 
         try {
-            const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\collaboration-endpoint-software-api-reference-guide-ce915.pdf";
+            const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\api-reference-guide-roomos-111.pdf";
 
             Stopwatch              stopwatch = Stopwatch.StartNew();
             ExtractedDocumentation xapi      = parsePdf(PDF_FILENAME);
@@ -114,7 +118,7 @@ public static class PdfParser {
             }*/
 
         } catch (ParsingException e) {
-            Letter firstLetter = e.word.Letters[0];
+            Letter firstLetter = getFirstNonQuotationMarkLetter(e.word.Letters);
             Console.WriteLine($"Failed to parse page {e.page.Number}: {e.Message} (word: {e.word.Text}, character style: {e.characterStyle}, parser state: {e.state}, position: " +
                 $"({firstLetter.StartBaseLine.X / DPI:N}\", {(e.page.Height - firstLetter.StartBaseLine.Y) / DPI:N}\"))");
             Console.WriteLine($"Font: {firstLetter.PointSize:N2}pt {firstLetter.FontName}");
@@ -133,22 +137,19 @@ public static class PdfParser {
     }
 
     private static void parseSection<T>(PdfDocument pdf, ICollection<T> xapiDestinationCollection) where T: AbstractCommand, new() {
-        string startBookmark, endBookmark;
+        Range commandPages;
 
         if (typeof(T) == typeof(DocXConfiguration)) {
-            startBookmark = "xConfiguration commands";
-            endBookmark   = "xCommand commands";
+            commandPages = getPagesForSection(pdf, "xConfiguration commands", "xCommand commands");
         } else if (typeof(T) == typeof(DocXCommand)) {
-            startBookmark = "xCommand commands";
-            endBookmark   = "xStatus commands";
+            commandPages = getPagesForSection(pdf, "xCommand commands", "xStatus commands");
         } else if (typeof(T) == typeof(DocXStatus)) {
-            startBookmark = "xStatus commands";
-            endBookmark   = "Appendices";
+            commandPages = getPagesForSection(pdf, "xStatus commands", "Configuration");
+            commandPages = commandPages.Start..(commandPages.End.Value -
+                2); // Exclude the Chapter 6: Command overview page, which doesn't have its own bookmark despite having a top-level navigation button
         } else {
             throw new ArgumentOutOfRangeException(nameof(xapiDestinationCollection), typeof(T), "Unknown command type");
         }
-
-        Range commandPages = getPagesForSection(pdf, startBookmark, endBookmark);
 
         IEnumerable<(Word word, Page page)> wordsOnPages = getWordsOnPages(pdf, commandPages);
 
@@ -189,7 +190,7 @@ public static class PdfParser {
 
             // Console.WriteLine($"Parsing {word.Text}\t(character style = {characterStyle}, parser state = {state})");
 
-            if (command is DocXStatus status && statusValueSpace is not null && characterStyle != CharacterStyle.VALUESPACE) {
+            if (command is DocXStatus status && statusValueSpace is not null && characterStyle != CharacterStyle.VALUESPACE_OR_DISCLAIMER) {
                 status.returnValueSpace = statusValueSpace switch {
                     "Integer" => new IntValueSpace(),
                     "String"  => new StringValueSpace(),
@@ -223,9 +224,16 @@ public static class PdfParser {
 
             switch (characterStyle) {
                 case CharacterStyle.METHOD_FAMILY_HEADING:
+                    if (state == ParserState.USAGE_DEFAULT_VALUE && parameter is StringParameter && parameter.defaultValue is not null) {
+                        parameter.defaultValue = parameter.defaultValue.TrimEnd('"');
+                    }
+
+                    resetMethodParsingState();
+
+                    state = ParserState.START;
                     //skip, not useful information, we'll get the method name from the METHOD_NAME_HEADING below
                     break;
-                case CharacterStyle.METHOD_NAME_HEADING:
+                case CharacterStyle.METHOD_FAMILY_HEADING or CharacterStyle.METHOD_NAME_HEADING:
                     // ReSharper disable once MergeIntoPattern broken null checking if you apply this suggestion
                     if (state == ParserState.USAGE_DEFAULT_VALUE && parameter is StringParameter && parameter.defaultValue is not null) {
                         parameter.defaultValue = parameter.defaultValue.TrimEnd('"');
@@ -279,23 +287,6 @@ public static class PdfParser {
                             break;
                         default:
                             throw new ParsingException(word, state, characterStyle, page, "unexpected state for character style");
-                    }
-
-                    break;
-                case CharacterStyle.USER_ROLE:
-                    if (state is ParserState.REQUIRES_USER_ROLE or ParserState.REQUIRES_USER_ROLE_ROLES) {
-                        state = ParserState.REQUIRES_USER_ROLE_ROLES;
-
-                        // sometimes Cisco forgets to put the space between enum values, like xCommand Call Disconnect's Requires User Role list
-                        foreach (string roleName in word.Text.TrimEnd(',').Split(',')) {
-                            if (parseEnum<UserRole>(roleName) is { } role) {
-                                command.requiresUserRole.Add(role);
-                            } else {
-                                throw new ParsingException(word, state, characterStyle, page, "role was not a recognized user role");
-                            }
-                        }
-                    } else {
-                        throw new ParsingException(word, state, characterStyle, page, "unexpected state for character style");
                     }
 
                     break;
@@ -357,8 +348,11 @@ public static class PdfParser {
                     }
 
                     break;
-                case CharacterStyle.VALUESPACE:
+                case CharacterStyle.VALUESPACE_OR_DISCLAIMER:
                     switch (state) {
+                        case ParserState.REQUIRES_USER_ROLE:
+                            // ignore the "Not available for the Webex Devices Cloud xAPI service on personal mode devices" disclaimer
+                            break;
                         case ParserState.VALUESPACE when command is DocXStatus:
                             statusValueSpace = appendWord(statusValueSpace, word, previousWordBaseline);
                             break;
@@ -506,6 +500,19 @@ public static class PdfParser {
                             break;
                         case ParserState.APPLIES_TO_PRODUCTS:
                             state = ParserState.REQUIRES_USER_ROLE;
+                            break;
+                        case ParserState.REQUIRES_USER_ROLE when word.Text is "role:":
+                            state = ParserState.REQUIRES_USER_ROLE_ROLES;
+                            break;
+                        case ParserState.REQUIRES_USER_ROLE_ROLES when !isDifferentParagraph(word, previousWordBaseline):
+                            foreach (string roleName in word.Text.TrimEnd(',').Split(',')) {
+                                if (parseEnum<UserRole>(roleName) is { } role) {
+                                    command.requiresUserRole.Add(role);
+                                } else {
+                                    throw new ParsingException(word, state, characterStyle, page, "role was not a recognized user role");
+                                }
+                            }
+
                             break;
                         case ParserState.USAGE_EXAMPLE:
                             if (word.Text == "where") {
@@ -689,8 +696,24 @@ public static class PdfParser {
         int[]           pageNumbers          = Enumerable.Range(0, pdf.NumberOfPages).ToArray()[pageIndices];
         foreach (int pageNumber in pageNumbers) {
             foreach (bool readLeftSide in new[] { true, false }) {
-                Page              page  = pdf.GetPage(pageNumber);
-                IEnumerable<Word> words = page.GetWords().Where(word => Program.isTextOnHalfOfPage(word, page, readLeftSide)).OrderBy(word => word, wordPositionComparer);
+                Page           page          = pdf.GetPage(pageNumber);
+                IWordExtractor wordExtractor = FixedDefaultWordExtractor.INSTANCE;
+                IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
+                    .Where(letter => Program.isTextOnHalfOfPage(letter, page, readLeftSide))
+                    .Select(letter => new Letter(
+                        letter.Value,
+                        letter.GlyphRectangle,
+                        // when Cisco made the monospaced quotation marks bigger, loss of floating-point precision lowered the baseline enough to mess up the letter order relied upon by the DefaultWordExtractor
+                        new PdfPoint(letter.StartBaseLine.X, Math.Round(letter.StartBaseLine.Y, 3)),
+                        new PdfPoint(letter.EndBaseLine.X, Math.Round(letter.EndBaseLine.Y, 3)),
+                        letter.Width,
+                        letter.FontSize,
+                        letter.Font,
+                        letter.Color,
+                        letter is { Value: "\"", PointSize: 9.6, FontName: var fontName } && fontName.EndsWith("CourierNewPSMT") ? 8.8 : letter.PointSize,
+                        letter.TextSequence)
+                    ).ToImmutableList();
+                IEnumerable<Word> words = wordExtractor.GetWords(lettersWithUnfuckedQuotationMarks);
 
                 foreach (Word word in words) {
                     yield return (word, page);
@@ -704,21 +727,22 @@ public static class PdfParser {
         IEnumerable<DocumentBookmarkNode> bookmarksInSection = bookmarks.GetNodes()
             .Where(node => node.Level == 0)
             .OfType<DocumentBookmarkNode>()
-            .OrderBy(node => node.PageNumber).SkipUntil(node => node.Title == previousBookmarkName).TakeUntil(node => node.Title == nextBookmarkName)
+            .OrderBy(node => node.PageNumber)
+            .SkipUntil(node => node.Title == previousBookmarkName)
+            .TakeUntil(node => node.Title == nextBookmarkName)
             .ToList();
         return bookmarksInSection.First().PageNumber..bookmarksInSection.Last().PageNumber;
     }
 
     private static CharacterStyle getCharacterStyle(Word word) =>
-        word.Letters[0] switch {
-            { PointSize: 14.0 }                                                                              => CharacterStyle.METHOD_FAMILY_HEADING,
+        getFirstNonQuotationMarkLetter(word.Letters) switch {
+            { PointSize: 16.0 }                                                                              => CharacterStyle.METHOD_FAMILY_HEADING,
             { PointSize: 10.0 }                                                                              => CharacterStyle.METHOD_NAME_HEADING,
-            { PointSize: >= 6 and <= 6.5 }                                                                   => CharacterStyle.PRODUCT_NAME,
-            { PointSize: 7.0 }                                                                               => CharacterStyle.USER_ROLE,
+            { PointSize: 6.0 }                                                                               => CharacterStyle.PRODUCT_NAME,
             { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans")                   => CharacterStyle.USAGE_HEADING,
-            { PointSize: 8.8, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT")              => CharacterStyle.USAGE_EXAMPLE,
+            { PointSize: 8.8 or 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT")       => CharacterStyle.USAGE_EXAMPLE,
             { PointSize: 8.8, FontName: var fontName } when fontName.EndsWith("CourierNewPS-ItalicMT")       => CharacterStyle.PARAMETER_NAME,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-ExtraLightOblique") => CharacterStyle.VALUESPACE,
+            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-ExtraLightOblique") => CharacterStyle.VALUESPACE_OR_DISCLAIMER,
             { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-Oblique")           => CharacterStyle.VALUESPACE_TERM,
             _                                                                                                => CharacterStyle.BODY
         };
@@ -726,6 +750,10 @@ public static class PdfParser {
     private static T? parseEnum<T>(string text) where T: struct, Enum => Enum.IsDefined(typeof(T), text) && Enum.TryParse(text, true, out T result) ? result : null;
 
     private static Product? parseProduct(string text) => parseEnum<Product>(text.Replace('/', '_'));
+
+    internal static Letter getFirstNonQuotationMarkLetter(IReadOnlyList<Letter> letters) {
+        return letters.SkipWhile(letter => letter.Value == "\"").FirstOrDefault(letters[0]);
+    }
 
 }
 
@@ -738,15 +766,14 @@ internal class WordPositionComparer: IComparer<Word> {
             return 1;
         }
 
-        Letter aLetter = a.Letters[0];
-        double aY      = aLetter.Location.Y + aLetter.PointSize;
+        Letter aLetter = PdfParser.getFirstNonQuotationMarkLetter(a.Letters);
+        double aY      = aLetter.StartBaseLine.Y;
 
-        Letter bLetter = b.Letters[0];
-        double bY      = bLetter.Location.Y + bLetter.PointSize;
+        Letter bLetter = PdfParser.getFirstNonQuotationMarkLetter(b.Letters);
+        double bY      = bLetter.StartBaseLine.Y;
 
-        int verticalComparison = aY.CompareTo(bY);
-        if (verticalComparison != 0) {
-            return -verticalComparison; //start from the top of the page, where the Y position is greatest
+        if (Math.Abs(aY - bY) >= 0.001) {
+            return -aY.CompareTo(bY); //start from the top of the page, where the Y position is greatest
         } else {
             double aX = aLetter.Location.X;
             double bX = bLetter.Location.X;
@@ -777,11 +804,10 @@ internal enum CharacterStyle {
     METHOD_FAMILY_HEADING,
     METHOD_NAME_HEADING,
     PRODUCT_NAME,
-    USER_ROLE,
     USAGE_HEADING,
     USAGE_EXAMPLE,
     PARAMETER_NAME,
-    VALUESPACE,
+    VALUESPACE_OR_DISCLAIMER,
     VALUESPACE_TERM,
     BODY
 
