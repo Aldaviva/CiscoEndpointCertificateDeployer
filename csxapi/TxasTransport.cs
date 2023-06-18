@@ -1,21 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Security;
-using System.Threading.Tasks;
 using System.Xml.Linq;
-using jaytwo.FluentUri;
 
-namespace CiscoEndpointDocumentationApiExtractor;
+namespace csxapi;
 
 /// <summary>
 /// Send xAPI commands over TXAS (Tandberg XML API Service), which is a protocol that uses XML over HTTP.
 /// </summary>
-public partial class Txas: XapiTransport {
+public class TxasTransport: XapiTransport {
 
     private static readonly CookieContainer DEFAULT_COOKIE_JAR = new();
     private static readonly XAttribute      COMMAND            = new("command", "True");
@@ -26,6 +19,8 @@ public partial class Txas: XapiTransport {
 
     private readonly Uri  baseUri;
     private readonly bool startedSession = false;
+
+    private bool shouldDisposeHttpClient = true;
 
     private Lazy<HttpClient> _httpClient = new(() => new HttpClient(new SocketsHttpHandler {
         AllowAutoRedirect       = true,
@@ -39,14 +34,15 @@ public partial class Txas: XapiTransport {
     public HttpClient httpClient {
         get => _httpClient.Value;
         set {
-            if (_httpClient.IsValueCreated && _httpClient.Value == value) {
+            if (_httpClient.IsValueCreated && _httpClient.Value != value) {
                 _httpClient.Value.Dispose();
-                _httpClient = new Lazy<HttpClient>(value);
+                _httpClient             = new Lazy<HttpClient>(() => value);
+                shouldDisposeHttpClient = true;
             }
         }
     }
 
-    public Txas(string hostname, string username, SecureString password) {
+    public TxasTransport(string hostname, string username, SecureString password) {
         this.hostname = hostname;
         this.username = username;
         this.password = password.Copy();
@@ -54,7 +50,7 @@ public partial class Txas: XapiTransport {
         baseUri = new UriBuilder("https", hostname, -1).Uri;
     }
 
-    public Txas(string hostname, string username, string password): this(hostname, username, ((Func<SecureString>) (() => {
+    public TxasTransport(string hostname, string username, string password): this(hostname, username, ((Func<SecureString>) (() => {
         SecureString secureString = new();
         foreach (char c in password) {
             secureString.AppendChar(c);
@@ -67,7 +63,7 @@ public partial class Txas: XapiTransport {
     private void Dispose(bool disposing) {
         if (disposing) {
             password.Dispose();
-            if (_httpClient.IsValueCreated) {
+            if (_httpClient.IsValueCreated && shouldDisposeHttpClient) {
                 _httpClient.Value.Dispose();
             }
 
@@ -80,7 +76,7 @@ public partial class Txas: XapiTransport {
         GC.SuppressFinalize(this);
     }
 
-    ~Txas() {
+    ~TxasTransport() {
         Dispose(false);
     }
 
@@ -97,37 +93,18 @@ public partial class Txas: XapiTransport {
     }
 
     public Task signOut() {
-        return httpClient.PostAsync(baseUri.WithPath("/xmlapi/session/end"), null!);
+        return httpClient.PostAsync(new UriBuilder(baseUri) { Path = "/xmlapi/session/end" }.Uri, null!);
     }
-
-    // public void Dispose() {
-    //     if (_httpClient.IsValueCreated) {
-    //         _httpClient.Value.Dispose();
-    //     }
-    //
-    //     password.Dispose();
-    // }
-    //
-    // // public Task 
-    // public ValueTask DisposeAsync() {
-    //     throw new NotImplementedException();
-    // }
-    //
-    // public async Task Dispose(bool skipSigningOut) {
-    //     if (!skipSigningOut) {
-    //
-    //     }
-    // }
 
     private Uri getTxasUri(string? readPath = null) {
         if (readPath is not null) {
-            return baseUri.WithPath("/getxml").WithQueryParameter("location", readPath);
+            return new UriBuilder(baseUri) { Path = "/getxml", Query = "location=" + readPath }.Uri;
         } else {
-            return baseUri.WithPath("putxml");
+            return new UriBuilder(baseUri) { Path = "/putxml" }.Uri;
         }
     }
 
-    private static XDocument createCommand(IEnumerable<string> commandParts, IDictionary<string, object>? parameters = null) {
+    private static XDocument createCommand(IEnumerable<string> commandParts, IDictionary<string, object?>? parameters = null) {
         XContainer commandEl = commandParts.Aggregate((XContainer) new XDocument(), (parentEl, command) => {
             XElement childEl = new(command);
             parentEl.Add(childEl);
@@ -138,7 +115,9 @@ public partial class Txas: XapiTransport {
             commandEl.Add(COMMAND);
         }
 
-        commandEl.Add(parameters?.Select(pair => new XElement(pair.Key, pair.Value.ToString())) ?? Enumerable.Empty<XElement>());
+        commandEl.Add(parameters?
+            .Where(pair => pair.Value != null).Cast<KeyValuePair<string, object>>()
+            .Select(pair => new XElement(pair.Key, pair.Value.ToString())) ?? Enumerable.Empty<XElement>());
 
         return commandEl.Document!;
     }
@@ -159,8 +138,8 @@ public partial class Txas: XapiTransport {
     public async Task<T> getConfigurationOrStatus<T>(string[] path) {
         using HttpResponseMessage response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, getTxasUri('/' + string.Join('/', path)))).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        XDocument responseDoc                  = await response.Content.readFromXmlAsync().ConfigureAwait(false);
-        XElement  findDescendentByElementNames = responseDoc.findDescendentByElementNames(path)!;
+        XDocument responseDoc                  = await response.Content.ReadFromXmlAsync().ConfigureAwait(false);
+        XElement  findDescendentByElementNames = responseDoc.FindDescendentByElementNames(path)!;
         string    rawValue                     = findDescendentByElementNames.Value;
         return typeof(T) switch {
             { } t when t == typeof(string) => (T) (object) rawValue,
@@ -176,13 +155,13 @@ public partial class Txas: XapiTransport {
         });
     }
 
-    public async Task<XElement> callMethod(IEnumerable<string> path, IDictionary<string, object> parameters) {
+    public async Task<XElement> callMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters = null) {
         using HttpResponseMessage response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Post, getTxasUri()) {
             Content = new TxasRequestContent(createCommand(path, parameters))
         }).ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
-        XDocument responseDoc = await response.Content.readFromXmlAsync().ConfigureAwait(false);
+        XDocument responseDoc = await response.Content.ReadFromXmlAsync().ConfigureAwait(false);
         return responseDoc.Root!.Elements().First();
     }
 

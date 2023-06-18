@@ -1,0 +1,7 @@
+# https://www.jetbrains.com/help/resharper/2023.1/Reference__Code_Inspections_CSHARP.html#CodeStyleIssues
+
+[*.cs]
+resharper_comment_typo_highlighting=none
+resharper_inconsistent_naming_highlighting=none
+resharper_unused_type_global_highlighting=none
+resharper_unused_member_global_highlighting=none

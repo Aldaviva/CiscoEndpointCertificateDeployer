@@ -1,29 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Xml.Linq;
 using Newtonsoft.Json.Linq;
 using StreamJsonRpc;
 
-namespace CiscoWebsocketXapi;
+namespace csxapi;
 
 [SuppressMessage("ReSharper", "CoVariantArrayConversion")]
-public class JsonRpcXapi: WebSocketXApi {
+public class WebSocketXapi: XapiTransport {
 
-    private readonly string          _hostname;
-    private readonly ClientWebSocket _webSocket = new();
-    private readonly JsonRpc         _jsonRpc;
+    public string hostname { get; }
+    public string username { get; }
 
-#if NETCOREAPP3_0_OR_GREATER || NET20_OR_GREATER
-    private readonly TraceListener _consoleTraceListener = new ConsoleTraceListener();
-#else
-    private readonly TraceListener _consoleTraceListener = new TextWriterTraceListener(Console.Out);
-#endif
+    private readonly ClientWebSocket                    _webSocket = new();
+    private readonly JsonRpc                            _jsonRpc;
+    private readonly TraceListener                      _consoleTraceListener = new ConsoleTraceListener();
+    private readonly IDictionary<long, Action<JObject>> _feedbackCallbacks    = new Dictionary<long, Action<JObject>>();
 
     public bool ConsoleTracing {
         get => _jsonRpc.TraceSource.Switch.Level == SourceLevels.All;
@@ -39,25 +33,22 @@ public class JsonRpcXapi: WebSocketXApi {
         }
     }
 
-    private readonly IDictionary<long, Action<JObject>> _feedbackCallbacks = new Dictionary<long, Action<JObject>>();
+    public WebSocketXapi(string hostname, string username, string password, bool allowSelfSigned = false) {
+        this.hostname = hostname;
+        this.username = username;
 
-    public JsonRpcXapi(string hostname, string username, string password, bool allowSelfSigned = false) {
-        _hostname = hostname;
-        _webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password)));
+        _webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(new UTF8Encoding(false, true).GetBytes(username + ":" + password), Base64FormattingOptions.None));
+
         if (allowSelfSigned) {
-#if NETSTANDARD2_1_OR_GREATER
             _webSocket.Options.RemoteCertificateValidationCallback = delegate { return true; };
-#else
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-#endif
         }
 
         _jsonRpc = new JsonRpc(new WebSocketMessageHandler(_webSocket));
     }
 
     public async Task connect(CancellationToken? cancellationToken = null) {
-        Uri uri = new UriBuilder("wss", _hostname, -1, "ws").Uri;
-        await _webSocket.ConnectAsync(uri, cancellationToken ?? CancellationToken.None);
+        Uri uri = new UriBuilder("wss", hostname, -1, "ws").Uri;
+        await _webSocket.ConnectAsync(uri, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
         _jsonRpc.AddLocalRpcMethod("xFeedback/Event", onFeedbackEvent);
         _jsonRpc.StartListening();
     }
@@ -106,20 +97,21 @@ public class JsonRpcXapi: WebSocketXApi {
     public Task<long> Subscribe<T>(string[] path, Action<T>       callback, bool notifyCurrentValue = false) => Subscribe((object[]) path, callback, notifyCurrentValue);
     public Task<long> Subscribe(string[]    path, Action<JObject> callback, bool notifyCurrentValue = false) => Subscribe((object[]) path, callback, notifyCurrentValue);
 
-    public async Task<long> Subscribe<T>(object[] path, Action<T> callback, bool notifyCurrentValue = false) {
-        long id = await Subscribe(path, notifyCurrentValue);
+    public async Task<long> Subscribe<T>(IEnumerable<object> path, Action<T> callback, bool notifyCurrentValue = false) {
+        long id = await Subscribe(path, notifyCurrentValue).ConfigureAwait(false);
         _feedbackCallbacks[id] = jobject => { callback(jobject.ToObject<T>()!); };
         return id;
     }
 
-    public async Task<long> Subscribe(object[] path, Action<JObject> callback, bool notifyCurrentValue = false) {
-        long id = await Subscribe(path, notifyCurrentValue);
+    public async Task<long> Subscribe(IEnumerable<object> path, Action<JObject> callback, bool notifyCurrentValue = false) {
+        long id = await Subscribe(path, notifyCurrentValue).ConfigureAwait(false);
         _feedbackCallbacks[id] = callback;
         return id;
     }
 
     private async Task<long> Subscribe(IEnumerable<object> path, bool notifyCurrentValue = false) {
-        var subscription = await _jsonRpc.InvokeWithParameterObjectAsync<IDictionary<string, object>>("xFeedback/Subscribe", new { Query = path, NotifyCurrentValue = notifyCurrentValue });
+        IDictionary<string, object> subscription = await _jsonRpc
+            .InvokeWithParameterObjectAsync<IDictionary<string, object>>("xFeedback/Subscribe", new { Query = path, NotifyCurrentValue = notifyCurrentValue }).ConfigureAwait(false);
         return (long) subscription["Id"];
     }
 
@@ -131,6 +123,32 @@ public class JsonRpcXapi: WebSocketXApi {
     public void Dispose() {
         _webSocket.Dispose();
         _jsonRpc.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    public ValueTask DisposeAsync() {
+        Dispose();
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+
+    public Task signOut() {
+        // You don't sign out of WebSocket connections. If you want to stop using the connection, call Dispose() instead.
+        return Task.CompletedTask;
+    }
+
+    public async Task<T> getConfigurationOrStatus<T>(string[] path) {
+        throw new NotImplementedException();
+    }
+
+    public async Task setConfiguration(string[] path, object newValue) {
+        throw new NotImplementedException();
+    }
+
+    public async Task<XElement> callMethod(IEnumerable<string> path, IDictionary<string, object> parameters) {
+        await Command(path, parameters).ConfigureAwait(false);
+        // TODO figure out how we want to handle returning either JSON or XML from different XapiTransport subclasses
+        return new XElement("todo");
     }
 
 }

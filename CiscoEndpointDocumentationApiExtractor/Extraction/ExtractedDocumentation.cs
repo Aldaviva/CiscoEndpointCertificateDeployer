@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
-namespace CiscoEndpointDocumentationApiExtractor;
+namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 public class ExtractedDocumentation {
 
@@ -16,6 +17,10 @@ public abstract class AbstractCommand {
     public ISet<Product> appliesTo { get; set; } = new HashSet<Product>();
     public ISet<UserRole> requiresUserRole { get; set; } = new HashSet<UserRole>();
     public string description { get; set; } = string.Empty;
+
+    public override string ToString() {
+        return string.Join(" ", name);
+    }
 
 }
 
@@ -97,6 +102,29 @@ internal class EnumValue {
 
     public string name { get; set; } = default!;
     public string? description { get; set; }
+
+    protected bool Equals(EnumValue other) {
+        return string.Equals(name, other.name, StringComparison.InvariantCultureIgnoreCase);
+    }
+
+    public override bool Equals(object? obj) {
+        if (ReferenceEquals(null, obj)) return false;
+        if (ReferenceEquals(this, obj)) return true;
+        if (obj.GetType() != GetType()) return false;
+        return Equals((EnumValue) obj);
+    }
+
+    public override int GetHashCode() {
+        return StringComparer.InvariantCultureIgnoreCase.GetHashCode(name);
+    }
+
+    public static bool operator ==(EnumValue? left, EnumValue? right) {
+        return Equals(left, right);
+    }
+
+    public static bool operator !=(EnumValue? left, EnumValue? right) {
+        return !Equals(left, right);
+    }
 
 }
 

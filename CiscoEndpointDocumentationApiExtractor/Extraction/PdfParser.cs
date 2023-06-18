@@ -11,14 +11,13 @@ using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Outline;
 using UglyToad.PdfPig.Util;
 
-namespace CiscoEndpointDocumentationApiExtractor;
+namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 public static class PdfParser {
 
     private const int DPI = 72;
 
-    private static readonly ISet<string>   XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS = new HashSet<string> { "Value", "space", "of", "the", "result", "returned:" };
-    private static readonly IWordExtractor WORD_EXTRACTOR                                = DefaultWordExtractor.Instance;
+    private static readonly ISet<string> XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS = new HashSet<string> { "Value", "space", "of", "the", "result", "returned:" };
 
     public static void Main() {
         // Console.WriteLine(string.Join("\n", guessEnumRange("Microphone.1/../Microphone.4/Line.1/Line.2/HDMI.2".Split('/')).Select(value => value.name)));
@@ -31,7 +30,7 @@ public static class PdfParser {
             ExtractedDocumentation xapi      = parsePdf(PDF_FILENAME);
             Console.WriteLine($"Parsed PDF in {stopwatch.Elapsed:g}");
 
-            IEnumerable<IGrouping<string, AbstractCommand>> duplicates = xapi.statuses
+            /*IEnumerable<IGrouping<string, AbstractCommand>> duplicates = xapi.statuses
                 .Concat<AbstractCommand>(xapi.configurations)
                 .Concat(xapi.commands)
                 .GroupBy(command => string.Join(' ', command.name.Skip(1)))
@@ -43,7 +42,7 @@ public static class PdfParser {
                 }
 
                 Console.WriteLine();
-            }
+            }*/
 
             // foreach (AbstractCommand command in ) {
             //     string name = ;
@@ -183,7 +182,7 @@ public static class PdfParser {
         }
 
         T command = new();
-        xapiDestinationCollection.Add(command);
+        // xapiDestinationCollection.Add(command);
 
         foreach ((Word word, Page page) in wordsOnPages) {
             CharacterStyle characterStyle = getCharacterStyle(word);
@@ -233,13 +232,13 @@ public static class PdfParser {
                     state = ParserState.START;
                     //skip, not useful information, we'll get the method name from the METHOD_NAME_HEADING below
                     break;
-                case CharacterStyle.METHOD_FAMILY_HEADING or CharacterStyle.METHOD_NAME_HEADING:
+                case CharacterStyle.METHOD_NAME_HEADING:
                     // ReSharper disable once MergeIntoPattern broken null checking if you apply this suggestion
                     if (state == ParserState.USAGE_DEFAULT_VALUE && parameter is StringParameter && parameter.defaultValue is not null) {
                         parameter.defaultValue = parameter.defaultValue.TrimEnd('"');
                     }
 
-                    if (state != ParserState.VERSION_AND_PRODUCTS_COVERED_PREAMBLE && state != ParserState.METHOD_NAME_HEADING) {
+                    if (state != ParserState.METHOD_NAME_HEADING) {
                         // finished previous method, moving to next method
                         command = new T();
                         xapiDestinationCollection.Add(command);
@@ -321,7 +320,7 @@ public static class PdfParser {
                     switch (state) {
                         case ParserState.USAGE_EXAMPLE:
                             if (!word.Text.EndsWith(']')) {
-                                requiredParameters.Add(word.Text);
+                                requiredParameters.Add(word.Text.Trim('"'));
                             }
 
                             // otherwise it's an optional parameter like [Channel: Channel]
@@ -357,7 +356,7 @@ public static class PdfParser {
                             statusValueSpace = appendWord(statusValueSpace, word, previousWordBaseline);
                             break;
                         case ParserState.VALUESPACE or ParserState.USAGE_PARAMETER_VALUE_SPACE_APPLIES_TO:
-                            Regex numericRangePattern = new(@"^\((?<min>-?\d+)\.\.(?<max>-?\d+)\)$");
+                            Regex numericRangePattern = new(@"^(?<openparen>\()?(?<min>-?\d+)\.\.(?<max>-?\d+)(?<-openparen>\))?(?(openparen)(?!))$");
                             switch (word.Text) {
                                 case "String" when parameter is null:
                                     if (parameterName is null) {
@@ -370,6 +369,7 @@ public static class PdfParser {
                                         description = parameterDescription is not null ? parameterDescription + '\n' : string.Empty
                                     };
 
+                                    (command as DocXConfiguration)?.parameters.Add(parameter);
                                     parameterName = null;
                                     break;
                                 case "Integer" when parameter is null:
@@ -383,7 +383,29 @@ public static class PdfParser {
                                         description = parameterDescription is not null ? parameterDescription + '\n' : string.Empty
                                     };
 
+                                    (command as DocXConfiguration)?.parameters.Add(parameter);
                                     parameterName = null;
+                                    break;
+                                case { } valueSpace when parameter is null && numericRangePattern.Match(valueSpace) is { Success: true } match:
+                                    if (parameterName is null) {
+                                        throw new ParsingException(word, state, characterStyle, page, "found parameter value space without a previously-parsed parameter name");
+                                    }
+
+                                    parameter = new IntParameter {
+                                        name        = parameterName,
+                                        required    = requiredParameters.Contains(parameterName),
+                                        description = parameterDescription is not null ? parameterDescription + '\n' : string.Empty,
+                                        ranges = {
+                                            new IntRange {
+                                                minimum = int.Parse(match.Groups["min"].Value),
+                                                maximum = int.Parse(match.Groups["max"].Value)
+                                            }
+                                        }
+                                    };
+
+                                    (command as DocXConfiguration)?.parameters.Add(parameter);
+                                    parameterName = null;
+
                                     break;
                                 case { } enumList when parameter is null:
                                     if (parameterName is null) {
@@ -397,6 +419,7 @@ public static class PdfParser {
                                         possibleValues = parseEnumValueSpacePossibleValues(enumList)
                                     };
 
+                                    (command as DocXConfiguration)?.parameters.Add(parameter);
                                     parameterName = null;
                                     break;
                                 case { } valueSpace when parameter is StringParameter _param && numericRangePattern.Match(valueSpace) is { Success: true } match:
@@ -662,8 +685,8 @@ public static class PdfParser {
         return Enumerable.ToHashSet(allValues.Select(s => new EnumValue { name = s }));
     }
 
-    private static HashSet<EnumValue> parseEnumValueSpacePossibleValues(string              enumList) => parseEnumValueSpacePossibleValues(enumList.Split('/', StringSplitOptions.RemoveEmptyEntries));
-    private static HashSet<EnumValue> parseEnumValueSpacePossibleValues(IEnumerable<string> enumList) => Enumerable.ToHashSet(enumList.Select(value => new EnumValue { name = value }));
+    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(string enumList) => parseEnumValueSpacePossibleValues(enumList.TrimEnd(')').Split('/', StringSplitOptions.RemoveEmptyEntries));
+    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(IEnumerable<string> enumList) => Enumerable.ToHashSet(enumList.Select(value => new EnumValue { name = value }));
 
     private static string appendWord(string? head, Word tail, double? previousWordBaseline) {
         double baselineDifference = getBaselineDifference(tail, previousWordBaseline);
@@ -692,14 +715,13 @@ public static class PdfParser {
     private static bool isDifferentParagraph(Word   word, double? previousWordBaseline) => isDifferentParagraph(getBaselineDifference(word, previousWordBaseline));
 
     private static IEnumerable<(Word word, Page page)> getWordsOnPages(PdfDocument pdf, Range pageIndices) {
-        IComparer<Word> wordPositionComparer = new WordPositionComparer();
-        int[]           pageNumbers          = Enumerable.Range(0, pdf.NumberOfPages).ToArray()[pageIndices];
+        int[] pageNumbers = Enumerable.Range(0, pdf.NumberOfPages).ToArray()[pageIndices];
         foreach (int pageNumber in pageNumbers) {
             foreach (bool readLeftSide in new[] { true, false }) {
                 Page           page          = pdf.GetPage(pageNumber);
                 IWordExtractor wordExtractor = FixedDefaultWordExtractor.INSTANCE;
                 IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
-                    .Where(letter => Program.isTextOnHalfOfPage(letter, page, readLeftSide))
+                    .Where(letter => isTextOnHalfOfPage(letter, page, readLeftSide))
                     .Select(letter => new Letter(
                         letter.Value,
                         letter.GlyphRectangle,
@@ -727,14 +749,12 @@ public static class PdfParser {
         IEnumerable<DocumentBookmarkNode> bookmarksInSection = bookmarks.GetNodes()
             .Where(node => node.Level == 0)
             .OfType<DocumentBookmarkNode>()
-            .OrderBy(node => node.PageNumber)
-            .SkipUntil(node => node.Title == previousBookmarkName)
-            .TakeUntil(node => node.Title == nextBookmarkName)
+            .OrderBy(node => node.PageNumber).SkipUntil(node => node.Title == previousBookmarkName).TakeUntil(node => node.Title == nextBookmarkName)
             .ToList();
         return bookmarksInSection.First().PageNumber..bookmarksInSection.Last().PageNumber;
     }
 
-    private static CharacterStyle getCharacterStyle(Word word) =>
+    internal static CharacterStyle getCharacterStyle(Word word) =>
         getFirstNonQuotationMarkLetter(word.Letters) switch {
             { PointSize: 16.0 }                                                                              => CharacterStyle.METHOD_FAMILY_HEADING,
             { PointSize: 10.0 }                                                                              => CharacterStyle.METHOD_NAME_HEADING,
@@ -755,9 +775,25 @@ public static class PdfParser {
         return letters.SkipWhile(letter => letter.Value == "\"").FirstOrDefault(letters[0]);
     }
 
+    internal static bool isTextOnHalfOfPage(Word word, Page page, bool isOnLeft) => isTextOnHalfOfPage(word.Letters[0], page, isOnLeft);
+
+    internal static bool isTextOnHalfOfPage(Letter letter, Page page, bool isOnLeft) {
+
+        const int POINTS_PER_INCH = 72;
+
+        const double LEFT_MARGIN   = 5.0 / 8.0 * POINTS_PER_INCH;
+        const double TOP_MARGIN    = 1.0 * POINTS_PER_INCH;
+        const double BOTTOM_MARGIN = POINTS_PER_INCH * 0.5;
+
+        return letter.Location.Y > BOTTOM_MARGIN
+            && letter.Location.Y < page.Height - TOP_MARGIN
+            && (letter.Location.X < (page.Width - LEFT_MARGIN) / 2 + LEFT_MARGIN) ^ !isOnLeft
+            && letter.Location.X > LEFT_MARGIN;
+    }
+
 }
 
-internal class WordPositionComparer: IComparer<Word> {
+/*internal class WordPositionComparer: IComparer<Word> {
 
     public int Compare(Word? a, Word? b) {
         if (a is null) {
@@ -781,7 +817,7 @@ internal class WordPositionComparer: IComparer<Word> {
         }
     }
 
-}
+}*/
 
 internal class ParsingException: Exception {
 

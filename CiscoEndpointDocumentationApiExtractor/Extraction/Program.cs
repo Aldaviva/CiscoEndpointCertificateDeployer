@@ -2,25 +2,34 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading.Tasks;
+using CiscoEndpointDocumentationApiExtractor.Generation;
 using MoreLinq;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Util;
 
-namespace CiscoEndpointDocumentationApiExtractor;
+namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 internal class Program {
 
-    private static void Main(string[] args) {
-        const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\api-reference-guide-roomos-111.pdf";
+    private const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\api-reference-guide-roomos-111.pdf";
 
+    public static async Task Main(string[] args) {
+        // Main2(args);
+        // return;
+        ExtractedDocumentation docs = PdfParser.parsePdf(PDF_FILENAME);
+        await new CsClientWriter().writeClient(docs);
+    }
+
+    private static void Main2(string[] args) {
         using PdfDocument pdf = PdfDocument.Open(PDF_FILENAME);
 
-        Page page = pdf.GetPage(361);
+        Page page = pdf.GetPage(233);
 
         IWordExtractor wordExtractor = DefaultWordExtractor.Instance;
         IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
-            .Where(letter => isTextOnHalfOfPage(letter, page, false))
+            .Where(letter => PdfParser.isTextOnHalfOfPage(letter, page, false))
             /*.Select(letter => letter switch {
                 { Value: "\"", PointSize: 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT") => new Letter(
                     letter.Value,
@@ -40,10 +49,11 @@ internal class Program {
         // IComparer<Word> wordPositionComparer = new WordPositionComparer();
         foreach (Word textBlock in pageText) {
             Letter firstLetter = textBlock.Letters[0];
-            Console.WriteLine(textBlock.Text);
-            /*Console.WriteLine($@"{textBlock.Text}
+            // Console.WriteLine(textBlock.Text);
+            Console.WriteLine($@"{textBlock.Text}
+    character style = {PdfParser.getCharacterStyle(textBlock)}
     typeface = {firstLetter.Font.Name.Split('+', 2).Last()}
-    point size = {firstLetter.PointSize}
+    point size = {firstLetter.PointSize:N3}
     italic = {firstLetter.Font.IsItalic}
     bold = {firstLetter.Font.IsBold}
     weight = {firstLetter.Font.Weight:N}
@@ -56,24 +66,8 @@ internal class Program {
     topline = {firstLetter.StartBaseLine.Y + firstLetter.PointSize:N}
     color = {firstLetter.Color}
     text sequence = {firstLetter.TextSequence:N0}
-");*/
+");
         }
-    }
-
-    internal static bool isTextOnHalfOfPage(Word word, Page page, bool isOnLeft) => isTextOnHalfOfPage(word.Letters[0], page, isOnLeft);
-
-    internal static bool isTextOnHalfOfPage(Letter letter, Page page, bool isOnLeft) {
-
-        const int POINTS_PER_INCH = 72;
-
-        const double LEFT_MARGIN   = 5.0 / 8.0 * POINTS_PER_INCH;
-        const double TOP_MARGIN    = 1.0 * POINTS_PER_INCH;
-        const double BOTTOM_MARGIN = POINTS_PER_INCH * 0.5;
-
-        return letter.Location.Y > BOTTOM_MARGIN
-            && letter.Location.Y < page.Height - TOP_MARGIN
-            && (letter.Location.X < (page.Width - LEFT_MARGIN) / 2 + LEFT_MARGIN) ^ !isOnLeft
-            && letter.Location.X > LEFT_MARGIN;
     }
 
 }

@@ -21,8 +21,7 @@ public class Program1 {
 
         Request request        = new(103, "xGet", new Dictionary<string, object> { { "Path", new List<string> { "Status", "SystemUnit", "State" } } });
         byte[]  requestBytes   = JsonSerializer.SerializeToUtf8Bytes(request, jsonOptions);
-        var     readOnlyMemory = new ReadOnlyMemory<byte>(requestBytes);
-        await webSocket.SendAsync(readOnlyMemory, WebSocketMessageType.Text, true, CancellationToken.None);
+        await webSocket.SendAsync(new ReadOnlyMemory<byte>(requestBytes), WebSocketMessageType.Text, true, CancellationToken.None);
 
         var                         receiveBuffer = new Memory<byte>(new byte[1024]);
         ValueWebSocketReceiveResult receiveResult = await webSocket.ReceiveAsync(receiveBuffer, CancellationToken.None);

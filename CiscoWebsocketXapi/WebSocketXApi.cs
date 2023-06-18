@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace CiscoWebsocketXapi;
 
-public interface XApi: IDisposable {
+public interface WebSocketXApi: IDisposable {
 
     Task<T> Get<T>(params string[] path);
     Task<T> Get<T>(params object[] path);

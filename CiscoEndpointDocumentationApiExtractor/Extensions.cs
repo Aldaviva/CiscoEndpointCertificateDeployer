@@ -1,7 +1,11 @@
 ﻿// ReSharper disable InconsistentNaming - Extension methods
 
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Security;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -47,6 +51,22 @@ public static class Extensions {
         XmlSerializer      xmlSerializer = new(typeof(T));
         await using Stream inputStream   = await content.ReadAsStreamAsync(cancellationToken);
         return (T?) xmlSerializer.Deserialize(inputStream);
+    }
+
+    [return: NotNullIfNotNull(nameof(stringWithNewLines))]
+    public static string? NewLinesToParagraphs(this string? stringWithNewLines) {
+        return string.IsNullOrEmpty(stringWithNewLines) ? stringWithNewLines : string.Join(null, Regex.Split(stringWithNewLines, @"\r?\n").Select(s => $"<para>{SecurityElement.Escape(s)}</para>"));
+
+    }
+
+    [return: NotNullIfNotNull(nameof(input))]
+    public static string? ToLowerFirstLetter(this string? input) {
+        return string.IsNullOrEmpty(input) ? input : char.ToLowerInvariant(input[0]) + input[1..];
+    }
+
+    [return: NotNullIfNotNull(nameof(input))]
+    public static string? ToUpperFirstLetter(this string? input) {
+        return string.IsNullOrEmpty(input) ? input : char.ToUpperInvariant(input[0]) + input[1..];
     }
 
 }

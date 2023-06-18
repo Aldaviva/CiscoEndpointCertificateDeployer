@@ -4,8 +4,9 @@ using System.Linq;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Util;
 
-namespace CiscoEndpointDocumentationApiExtractor;
+namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
+// TODO: this was fixed upstream in version 0.1.8
 /// <summary>
 /// <para>Copied from <see cref="DefaultWordExtractor"/> but with two fixes:</para>
 /// <para>- update <c>lastY</c> (renamed from <c>y</c>) after each word, instead of only setting it once at the start of the page</para>
