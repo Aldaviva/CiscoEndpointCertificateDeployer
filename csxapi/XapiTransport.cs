@@ -1,18 +1,18 @@
 ﻿using System.Xml.Linq;
 
-namespace csxapi;
+namespace CSxAPI;
 
-public interface XapiTransport: IDisposable, IAsyncDisposable {
+public interface IXapiTransport: IDisposable, IAsyncDisposable {
 
-    string hostname { get; }
-    string username { get; }
+    string Hostname { get; }
+    string Username { get; }
 
-    Task signOut();
+    Task SignOut();
 
     Task<T> getConfigurationOrStatus<T>(string[] path);
 
     Task setConfiguration(string[] path, object newValue);
 
-    Task<XElement> callMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters);
+    Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters);
 
 }

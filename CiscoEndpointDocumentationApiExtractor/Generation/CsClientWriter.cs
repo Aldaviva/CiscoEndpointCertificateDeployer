@@ -10,7 +10,8 @@ namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
 public class CsClientWriter {
 
-    private const string GENERATED_DIR = @"..\..\..\..\csxapi\Generated";
+    private const string GENERATED_DIR = @"..\..\..\..\CSxAPI\Generated";
+    private const string NAMESPACE     = "CSxAPI";
 
     private const string FILE_HEADER = """
         // Generated file
@@ -31,43 +32,24 @@ public class CsClientWriter {
     private static readonly UTF8Encoding UTF8 = new(false, true);
 
     public async Task writeClient(ExtractedDocumentation documentation) {
-        await using FileStream commandsFile  = new(Path.Combine(GENERATED_DIR, "Commands.cs"), FileMode.Create, FileAccess.Write, FileShare.Read);
-        await using FileStream icommandsFile = new(Path.Combine(GENERATED_DIR, "ICommands.cs"), FileMode.Create, FileAccess.Write, FileShare.Read);
-        await using FileStream enumsFile     = new(Path.Combine(GENERATED_DIR, "Enums.cs"), FileMode.Create, FileAccess.Write, FileShare.Read);
+        await writeConfiguration(documentation);
+        await writeCommands(documentation);
+        await writeEnums(documentation);
+    }
 
-        await using StreamWriter commandsWriter  = new(commandsFile, UTF8);
-        await using StreamWriter icommandsWriter = new(icommandsFile, UTF8);
-        await using StreamWriter enumsWriter     = new(enumsFile, UTF8);
+    private static StreamWriter openFileStream(string filename) => new(new FileStream(Path.Combine(GENERATED_DIR, filename), FileMode.Create, FileAccess.Write, FileShare.Read), UTF8);
 
-        IDictionary<string, ISet<InterfaceChild>> interfaceTree = new Dictionary<string, ISet<InterfaceChild>>();
+    private static async Task writeCommands(ExtractedDocumentation documentation) {
+        await using StreamWriter icommandsWriter = openFileStream("ICommands.cs");
+        await using StreamWriter commandsWriter  = openFileStream("Commands.cs");
 
-        await enumsWriter.WriteAsync(FILE_HEADER);
-        await enumsWriter.WriteAsync("namespace csxapi;");
-
-        foreach (DocXCommand command in documentation.commands) {
-            string childInterfaceName = getInterfaceName(command);
-            putInterfaceChild(childInterfaceName, new InterfaceMethod(command));
-
-            for (int length = command.name.Count - 1; length > 1; length--) {
-                string parentInterfaceName = getInterfaceName(new DocXStatus { name = command.name.Take(length).ToList() });
-                putInterfaceChild(parentInterfaceName, new Subinterface(childInterfaceName, command.name[length - 1]));
-                childInterfaceName = parentInterfaceName;
-            }
-
-            void putInterfaceChild(string interfaceName, InterfaceChild child) {
-                if (interfaceTree.TryGetValue(interfaceName, out ISet<InterfaceChild>? entry)) {
-                    entry.Add(child);
-                } else {
-                    interfaceTree.Add(interfaceName, new HashSet<InterfaceChild> { child });
-                }
-            }
-        }
+        IDictionary<string, ISet<InterfaceChild>> interfaceTree = generateInterfaceTree(documentation.commands);
 
         await icommandsWriter.WriteAsync(FILE_HEADER);
-        await icommandsWriter.WriteAsync("""
+        await icommandsWriter.WriteAsync($"""
             using System.Xml.Linq;
             
-            namespace csxapi;
+            namespace {NAMESPACE};
 
 
             """);
@@ -77,13 +59,13 @@ public class CsClientWriter {
 
             foreach (InterfaceChild interfaceChild in interfaceNode.Value) {
                 switch (interfaceChild) {
-                    case InterfaceMethod { command: DocXCommand command } method:
+                    case InterfaceMethod { command: DocXCommand command }:
                         await icommandsWriter.WriteAsync($"""
                 /// <summary>
-                /// {method.command.description.NewLinesToParagraphs()}
+                /// {command.description.NewLinesToParagraphs()}
                 /// </summary>
             {string.Join("\r\n", command.parameters.Select(param => $"    /// <param name=\"{getParameterName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
-                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the XML response from the device.</returns>
+                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>
                 {generateMethodSignature(command, true)};
 
 
@@ -103,7 +85,7 @@ public class CsClientWriter {
         await commandsWriter.WriteAsync($$"""
             using System.Xml.Linq;
 
-            namespace csxapi;
+            namespace {{NAMESPACE}};
 
             public class Commands: {{string.Join(", ", interfaceTree.Keys)}} {
 
@@ -130,12 +112,38 @@ public class CsClientWriter {
 
                 """);
 
+        }
+
+        foreach (KeyValuePair<string, ISet<InterfaceChild>> interfaceNode in interfaceTree) {
+            foreach (Subinterface subinterface in interfaceNode.Value.OfType<Subinterface>()) {
+                await commandsWriter.WriteAsync($"    {subinterface.interfaceName} {interfaceNode.Key}.{subinterface.getterName} => this;\r\n");
+            }
+        }
+
+        await commandsWriter.WriteAsync("}");
+    }
+
+    private static async Task writeEnums(ExtractedDocumentation documentation) {
+        await using StreamWriter enumsWriter = openFileStream("Enums.cs");
+
+        await enumsWriter.WriteAsync(FILE_HEADER);
+        await enumsWriter.WriteAsync($"namespace {NAMESPACE};");
+
+        foreach (DocXConfiguration command in documentation.commands.Concat(documentation.configurations)) {
             await enumsWriter.WriteAsync(string.Join(null, command.parameters.Where(parameter => parameter.type == DataType.ENUM).Cast<EnumParameter>().Select(parameter => {
                 string enumTypeName = getEnumName(command, parameter.name);
 
-                static string xapiNameToCsName(EnumValue value) {
-                    string name = string.Join(null, value.name.Split('-').Select(s => s.ToUpperFirstLetter()));
-                    name = Regex.Replace(name, @"[^a-z0-9_]", match => match.Value == "." ? "_" : string.Empty, RegexOptions.IgnoreCase).ToUpperFirstLetter();
+                string xapiNameToCsName(EnumValue value) {
+                    bool   isTimeZone = command.name.SequenceEqual(new[] { "xConfiguration", "Time", "Zone" }) && parameter.name == "Zone";
+                    string name       = isTimeZone ? value.name : string.Join(null, value.name.Split('-').Select(s => s.ToUpperFirstLetter()));
+                    name = Regex.Replace(name, @"[^a-z0-9_]", match => match.Value switch {
+                        "."                                               => "_",
+                        "/"                                               => "Ⳇ",      //"Ⳇ",
+                        "+" when isTimeZone                               => "_Plus_", //ႵᏐǂߙƚϯᵻᵼ
+                        "-" when isTimeZone && value.name.Contains("GMT") => "_Minus_",
+                        "-" when isTimeZone                               => "_",
+                        _                                                 => string.Empty
+                    }, RegexOptions.IgnoreCase).ToUpperFirstLetter();
                     return char.IsLetter(name[0]) ? name : "_" + name;
                 }
 
@@ -157,7 +165,7 @@ public class CsClientWriter {
                 
                 public enum {{enumTypeName}} {
 
-                    {{string.Join(", ", parameter.possibleValues.Select(xapiNameToCsName))}}
+                {{string.Join(",\r\n\r\n", parameter.possibleValues.Select(value => $"    /// <summary><c>{value.name}</c></summary>\r\n    {xapiNameToCsName(value)}"))}}
 
                 }
 
@@ -170,15 +178,86 @@ public class CsClientWriter {
                 """;
             })));
         }
+    }
+
+    private static async Task writeConfiguration(ExtractedDocumentation documentation) {
+        await using StreamWriter configurationWriter  = openFileStream("Configuration.cs");
+        await using StreamWriter iconfigurationWriter = openFileStream("IConfiguration.cs");
+
+        foreach (DocXConfiguration configuration in documentation.configurations) {
+            configuration.name = configuration.name.Where((s, i) =>
+                    !configuration?.parameters.Any(parameter => parameter is IntParameter { arrayIndexItemParameterPosition: { } paramIndex } && paramIndex == i) ?? true)
+                .ToList();
+        }
+
+        IDictionary<string, ISet<InterfaceChild>> interfaceTree = generateInterfaceTree(documentation.configurations);
+
+        await iconfigurationWriter.WriteAsync(FILE_HEADER);
+        await iconfigurationWriter.WriteAsync($"""
+            using System.Xml.Linq;
+            
+            namespace {NAMESPACE};
+
+
+            """);
 
         foreach (KeyValuePair<string, ISet<InterfaceChild>> interfaceNode in interfaceTree) {
-            foreach (Subinterface subinterface in interfaceNode.Value.OfType<Subinterface>()) {
-                await commandsWriter.WriteAsync($"    {subinterface.interfaceName} {interfaceNode.Key}.{subinterface.getterName} => this;\r\n");
+            await iconfigurationWriter.WriteAsync($"public interface {interfaceNode.Key} {{\r\n\r\n");
+
+            foreach (InterfaceChild interfaceChild in interfaceNode.Value) {
+                switch (interfaceChild) {
+                    case InterfaceMethod { command: DocXConfiguration configuration } when configuration.parameters.Any():
+                        await iconfigurationWriter.WriteAsync($"""
+                /// <summary>
+                /// {configuration.description.NewLinesToParagraphs()}
+                /// </summary>
+            {string.Join("\r\n", configuration.parameters.Select(param => $"    /// <param name=\"{getParameterName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
+                /// <returns>A <see cref="Task"/> that will complete asynchronously when the configuration change has been received by the device.</returns>
+                {generateMethodSignature(configuration, true, true)};
+
+                /// <summary>
+                /// {configuration.description.NewLinesToParagraphs()}
+                /// </summary>
+                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>
+                {generateMethodSignature(configuration, false, true)};
+
+
+            """);
+                        break;
+
+                    case Subinterface s:
+                        await iconfigurationWriter.WriteAsync($"    {s.interfaceName} {s.getterName} {{ get; }}\r\n\r\n");
+                        break;
+                }
+            }
+
+            await iconfigurationWriter.WriteAsync("}\r\n\r\n");
+        }
+    }
+
+    private static IDictionary<string, ISet<InterfaceChild>> generateInterfaceTree(IEnumerable<AbstractCommand> documentation) {
+        IDictionary<string, ISet<InterfaceChild>> interfaceTree = new Dictionary<string, ISet<InterfaceChild>>();
+
+        foreach (AbstractCommand command in documentation) {
+            string childInterfaceName = getInterfaceName(command);
+            putInterfaceChild(childInterfaceName, new InterfaceMethod(command));
+
+            for (int length = command.name.Count - 1; length > 1; length--) {
+                string parentInterfaceName = getInterfaceName(new DocXStatus { name = command.name.Take(length).ToList() });
+                putInterfaceChild(parentInterfaceName, new Subinterface(childInterfaceName, command.name[length - 1]));
+                childInterfaceName = parentInterfaceName;
+            }
+
+            void putInterfaceChild(string interfaceName, InterfaceChild child) {
+                if (interfaceTree.TryGetValue(interfaceName, out ISet<InterfaceChild>? entry)) {
+                    entry.Add(child);
+                } else {
+                    interfaceTree.Add(interfaceName, new HashSet<InterfaceChild> { child });
+                }
             }
         }
 
-        await commandsWriter.WriteAsync("}");
-
+        return interfaceTree;
     }
 
     private static string generateMethodSignature(DocXCommand command, bool isInterfaceMethod) =>
@@ -188,8 +267,18 @@ public class CsClientWriter {
             DataType.ENUM    => getEnumName(command, parameter.name)
         }}{(parameter.required ? string.Empty : "?")} {getParameterName(parameter)}{(parameter.required || !isInterfaceMethod ? string.Empty : " = null")}"))})";
 
+    private static string generateMethodSignature(DocXConfiguration configuration, bool isSetter, bool isInterfaceMethod) =>
+        $"{(isInterfaceMethod ? string.Empty : "async ")}Task{(isSetter ? "" : "<XElement>")} {(isInterfaceMethod ? string.Empty : getInterfaceName(configuration) + '.')}{configuration.name.Last()}({string.Join(", ", configuration.parameters.SkipLast(isSetter ? 0 : 1).Select(parameter => $"{parameter.type switch {
+            DataType.INTEGER => "int",
+            DataType.STRING  => "string",
+            DataType.ENUM    => getEnumName(configuration, parameter.name)
+        }} {getParameterName(parameter)}"))})";
+
     private static string getInterfaceName(AbstractCommand method) {
-        return "I" + string.Join(null, method.name.Skip(1).SkipLast(1).Append(method.name[0][1..] + 's'));
+        return "I" + string.Join(null,
+            method.name.Skip(1)
+                .SkipLast(1)
+                .Append(method.name[0][1..] + 's')); //will need to be "es" for Statuses
     }
 
     private static string getEnumName(AbstractCommand command, string parameterName) {

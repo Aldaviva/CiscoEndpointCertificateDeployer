@@ -2,16 +2,21 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <Version>0.0.0</Version>
+        <Version>0.0.0-SNAPSHOT1</Version>
         <Authors>Ben Hutchison</Authors>
         <Copyright>© 2023 $(Authors)</Copyright>
         <Company>$(Authors)</Company>
+        <PackageId>CSxAPI</PackageId>
+        <Title>CSxAPI</Title>
+        <AssemblyTitle>C# xAPI for Cisco TelePresence endpoints</AssemblyTitle>
+        <Product>$(Title)</Product>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>true</ImplicitUsings>
-        <Product>CSXAPI</Product>
-        <AssemblyTitle>C# xAPI</AssemblyTitle>
         <NoWarn>VSTHRD200</NoWarn>
+        <RootNamespace>CSxAPI</RootNamespace>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <Description>C# xAPI for Cisco TelePresence endpoints</Description>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,11 +24,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <EditorConfigFiles Remove="C:\Users\Ben\Documents\Projects\CiscoEndpointCertificateDeployer\csxapi\Generated\.editorconfig" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Include="C:\Users\Ben\Documents\Projects\CiscoEndpointCertificateDeployer\csxapi\Generated\.editorconfig" />
+        <EditorConfigFiles Remove="Generated\.editorconfig" />
+        <None Include="Generated\.editorconfig" />
     </ItemGroup>
 
 </Project>

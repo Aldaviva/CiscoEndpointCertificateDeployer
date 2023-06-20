@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CiscoWebsocketSample", "Cis
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CiscoWebsocketXapi", "CiscoWebsocketXapi\CiscoWebsocketXapi.csproj", "{C33ADBB4-815C-4F76-AD50-763363BBA2C8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "csxapi", "csxapi\csxapi.csproj", "{98FB762B-1267-4BB6-900D-BA1046F874BA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSxAPI", "csxapi\CSxAPI.csproj", "{98FB762B-1267-4BB6-900D-BA1046F874BA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

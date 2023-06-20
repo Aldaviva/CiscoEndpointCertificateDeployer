@@ -6,13 +6,13 @@ using System.Xml.Linq;
 using Newtonsoft.Json.Linq;
 using StreamJsonRpc;
 
-namespace csxapi;
+namespace CSxAPI;
 
 [SuppressMessage("ReSharper", "CoVariantArrayConversion")]
-public class WebSocketXapi: XapiTransport {
+public class WebSocketXapi: IXapiTransport {
 
-    public string hostname { get; }
-    public string username { get; }
+    public string Hostname { get; }
+    public string Username { get; }
 
     private readonly ClientWebSocket                    _webSocket = new();
     private readonly JsonRpc                            _jsonRpc;
@@ -34,8 +34,8 @@ public class WebSocketXapi: XapiTransport {
     }
 
     public WebSocketXapi(string hostname, string username, string password, bool allowSelfSigned = false) {
-        this.hostname = hostname;
-        this.username = username;
+        Hostname = hostname;
+        Username = username;
 
         _webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(new UTF8Encoding(false, true).GetBytes(username + ":" + password), Base64FormattingOptions.None));
 
@@ -47,7 +47,7 @@ public class WebSocketXapi: XapiTransport {
     }
 
     public async Task connect(CancellationToken? cancellationToken = null) {
-        Uri uri = new UriBuilder("wss", hostname, -1, "ws").Uri;
+        Uri uri = new UriBuilder("wss", Hostname, -1, "ws").Uri;
         await _webSocket.ConnectAsync(uri, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
         _jsonRpc.AddLocalRpcMethod("xFeedback/Event", onFeedbackEvent);
         _jsonRpc.StartListening();
@@ -132,7 +132,7 @@ public class WebSocketXapi: XapiTransport {
         return ValueTask.CompletedTask;
     }
 
-    public Task signOut() {
+    public Task SignOut() {
         // You don't sign out of WebSocket connections. If you want to stop using the connection, call Dispose() instead.
         return Task.CompletedTask;
     }
@@ -145,7 +145,7 @@ public class WebSocketXapi: XapiTransport {
         throw new NotImplementedException();
     }
 
-    public async Task<XElement> callMethod(IEnumerable<string> path, IDictionary<string, object> parameters) {
+    public async Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object> parameters) {
         await Command(path, parameters).ConfigureAwait(false);
         // TODO figure out how we want to handle returning either JSON or XML from different XapiTransport subclasses
         return new XElement("todo");

@@ -15,15 +15,30 @@ namespace CiscoWebsocketXapi;
 [SuppressMessage("ReSharper", "CoVariantArrayConversion")]
 public class JsonRpcXapi: WebSocketXApi {
 
-    private readonly string          _hostname;
-    private readonly ClientWebSocket _webSocket = new();
-    private readonly JsonRpc         _jsonRpc;
+    private readonly string                             _hostname;
+    private readonly ClientWebSocket                    _webSocket = new();
+    private readonly JsonRpc                            _jsonRpc;
+    private readonly IDictionary<long, Action<JObject>> _feedbackCallbacks = new Dictionary<long, Action<JObject>>();
 
 #if NETCOREAPP3_0_OR_GREATER || NET20_OR_GREATER
     private readonly TraceListener _consoleTraceListener = new ConsoleTraceListener();
 #else
     private readonly TraceListener _consoleTraceListener = new TextWriterTraceListener(Console.Out);
 #endif
+
+    public JsonRpcXapi(string hostname, string username, string password, bool allowSelfSigned = false) {
+        _hostname = hostname;
+        _webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(new UTF8Encoding(false, true).GetBytes(username + ":" + password)));
+        if (allowSelfSigned) {
+#if NETSTANDARD2_1_OR_GREATER
+            _webSocket.Options.RemoteCertificateValidationCallback = delegate { return true; };
+#else
+            System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+#endif
+        }
+
+        _jsonRpc = new JsonRpc(new WebSocketMessageHandler(_webSocket));
+    }
 
     public bool ConsoleTracing {
         get => _jsonRpc.TraceSource.Switch.Level == SourceLevels.All;
@@ -37,22 +52,6 @@ public class JsonRpcXapi: WebSocketXApi {
                 traceSource.Listeners.Remove(_consoleTraceListener);
             }
         }
-    }
-
-    private readonly IDictionary<long, Action<JObject>> _feedbackCallbacks = new Dictionary<long, Action<JObject>>();
-
-    public JsonRpcXapi(string hostname, string username, string password, bool allowSelfSigned = false) {
-        _hostname = hostname;
-        _webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + password)));
-        if (allowSelfSigned) {
-#if NETSTANDARD2_1_OR_GREATER
-            _webSocket.Options.RemoteCertificateValidationCallback = delegate { return true; };
-#else
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-#endif
-        }
-
-        _jsonRpc = new JsonRpc(new WebSocketMessageHandler(_webSocket));
     }
 
     public async Task connect(CancellationToken? cancellationToken = null) {

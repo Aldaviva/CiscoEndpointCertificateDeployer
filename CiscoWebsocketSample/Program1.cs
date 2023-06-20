@@ -12,15 +12,15 @@ public class Program1 {
         JsonSerializerOptions jsonOptions = new() { Converters = { new ObjectToInferredTypesConverter() } };
 
         using ClientWebSocket webSocket = new();
-        webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("ben:password")));
+        webSocket.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("ben:" + Environment.GetEnvironmentVariable("password"))));
         webSocket.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true; // allow self-signed certificates
 // webSocket.Options.Proxy                               = new WebProxy("127.0.0.1", 9998);
         // webSocket.Options.UseDefaultCredentials = true;
 
         await webSocket.ConnectAsync(new Uri("wss://roomkit.aldaviva.com/ws"), CancellationToken.None);
 
-        Request request        = new(103, "xGet", new Dictionary<string, object> { { "Path", new List<string> { "Status", "SystemUnit", "State" } } });
-        byte[]  requestBytes   = JsonSerializer.SerializeToUtf8Bytes(request, jsonOptions);
+        Request request      = new(103, "xGet", new Dictionary<string, object> { { "Path", new List<string> { "Status", "SystemUnit", "State" } } });
+        byte[]  requestBytes = JsonSerializer.SerializeToUtf8Bytes(request, jsonOptions);
         await webSocket.SendAsync(new ReadOnlyMemory<byte>(requestBytes), WebSocketMessageType.Text, true, CancellationToken.None);
 
         var                         receiveBuffer = new Memory<byte>(new byte[1024]);

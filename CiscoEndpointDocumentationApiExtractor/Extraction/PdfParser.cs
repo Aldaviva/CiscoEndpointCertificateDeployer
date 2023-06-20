@@ -154,6 +154,7 @@ public static class PdfParser {
 
         ParserState state                = ParserState.START;
         double?     previousWordBaseline = default;
+        Word?       previousWord         = default;
 
         ISet<string> requiredParameters = new HashSet<string>();
         string?      parameterName;
@@ -163,6 +164,8 @@ public static class PdfParser {
         int          parameterUsageIndex;
         EnumValue?   enumValue;
         string?      statusValueSpace;
+        string       enumListDelimiter;
+        string?      partialEnumValue;
 
         resetMethodParsingState();
 
@@ -179,10 +182,11 @@ public static class PdfParser {
             parameterName        = default;
             parameterDescription = default;
             enumValue            = default;
+            enumListDelimiter    = "/";
+            partialEnumValue     = default;
         }
 
         T command = new();
-        // xapiDestinationCollection.Add(command);
 
         foreach ((Word word, Page page) in wordsOnPages) {
             CharacterStyle characterStyle = getCharacterStyle(word);
@@ -299,15 +303,27 @@ public static class PdfParser {
                     break;
                 case CharacterStyle.USAGE_EXAMPLE:
                     if (state == ParserState.USAGE_EXAMPLE) {
-                        if (command is DocXConfiguration xConfiguration && Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
-                            IntParameter indexParameter = new() {
-                                arrayIndexItemParameterPosition = parameterUsageIndex,
-                                required                        = true,
-                                name                            = match.Groups["name"].Value,
-                                namePrefix                      = match.Groups["prefix"].Value.EmptyToNull()
-                            };
-                            xConfiguration.parameters.Add(indexParameter);
-                            requiredParameters.Add(indexParameter.name);
+                        if (command is DocXConfiguration xConfiguration) {
+                            if (Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
+                                IntParameter indexParameter = new() {
+                                    arrayIndexItemParameterPosition = parameterUsageIndex,
+                                    required                        = true,
+                                    name                            = match.Groups["name"].Value,
+                                    namePrefix                      = match.Groups["prefix"].Value.EmptyToNull()
+                                };
+                                xConfiguration.parameters.Add(indexParameter);
+                                requiredParameters.Add(indexParameter.name);
+                            } else if (Regex.Match(word.Text, @"^\[(?<min>-?\d+)\.\.(?<max>-?\d+)\]$") is { Success: true } match2) {
+                                IntParameter channelParameter = new() {
+                                    arrayIndexItemParameterPosition = parameterUsageIndex,
+                                    required                        = true,
+                                    name                            = previousWord!.Text,
+                                    ranges                          = { new IntRange { minimum = int.Parse(match2.Groups["min"].Value), maximum = int.Parse(match2.Groups["max"].Value) } }
+                                };
+                                xConfiguration.parameters.Add(channelParameter);
+                                requiredParameters.Add(channelParameter.name);
+                            }
+
                         }
 
                         parameterUsageIndex++;
@@ -412,11 +428,15 @@ public static class PdfParser {
                                         throw new ParsingException(word, state, characterStyle, page, "found parameter value space without a previously-parsed parameter name");
                                     }
 
+                                    if (enumList.EndsWith(',')) {
+                                        enumListDelimiter = ",";
+                                    }
+
                                     parameter = new EnumParameter {
                                         name           = parameterName,
                                         required       = requiredParameters.Contains(parameterName),
                                         description    = parameterDescription is not null ? parameterDescription + '\n' : string.Empty,
-                                        possibleValues = parseEnumValueSpacePossibleValues(enumList)
+                                        possibleValues = parseEnumValueSpacePossibleValues(enumList, enumListDelimiter)
                                     };
 
                                     (command as DocXConfiguration)?.parameters.Add(parameter);
@@ -464,10 +484,15 @@ public static class PdfParser {
                                     break;
                                 case { } enumList when parameter is EnumParameter _param:
                                     //second line of wrapped enum values
-                                    IEnumerable<EnumValue> additionalValues = enumList.Split('/', StringSplitOptions.RemoveEmptyEntries)
-                                        .Select(value => new EnumValue { name = value });
-                                    foreach (EnumValue additionalValue in additionalValues) {
-                                        _param.possibleValues.Add(additionalValue);
+                                    if (enumListDelimiter == "," && (enumList.EndsWith('_') || enumList.EndsWith('/'))) {
+                                        partialEnumValue += enumList;
+                                    } else {
+                                        IEnumerable<EnumValue> additionalValues = parseEnumValueSpacePossibleValues((partialEnumValue ?? "") + enumList, enumListDelimiter);
+                                        foreach (EnumValue additionalValue in additionalValues) {
+                                            _param.possibleValues.Add(additionalValue);
+                                        }
+
+                                        partialEnumValue = null;
                                     }
 
                                     break;
@@ -645,6 +670,7 @@ public static class PdfParser {
             }
 
             previousWordBaseline = word.Letters[0].StartBaseLine.Y;
+            previousWord         = word;
         }
     }
 
@@ -685,7 +711,9 @@ public static class PdfParser {
         return Enumerable.ToHashSet(allValues.Select(s => new EnumValue { name = s }));
     }
 
-    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(string enumList) => parseEnumValueSpacePossibleValues(enumList.TrimEnd(')').Split('/', StringSplitOptions.RemoveEmptyEntries));
+    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(string enumList, string delimiter = "/") =>
+        parseEnumValueSpacePossibleValues(enumList.TrimEnd(')').Split(delimiter, StringSplitOptions.RemoveEmptyEntries));
+
     private static ISet<EnumValue> parseEnumValueSpacePossibleValues(IEnumerable<string> enumList) => Enumerable.ToHashSet(enumList.Select(value => new EnumValue { name = value }));
 
     private static string appendWord(string? head, Word tail, double? previousWordBaseline) {

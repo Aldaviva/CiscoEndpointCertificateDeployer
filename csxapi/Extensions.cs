@@ -1,6 +1,6 @@
 ﻿using System.Xml.Linq;
 
-namespace csxapi;
+namespace CSxAPI;
 
 internal static class Extensions {
 
@@ -24,8 +24,8 @@ internal static class Extensions {
     }
 
     public static async Task<XDocument> ReadFromXmlAsync(this HttpContent content, LoadOptions xmlLoadOptions = LoadOptions.None, CancellationToken cancellationToken = default) {
-        await using Stream contentStream = await content.ReadAsStreamAsync(cancellationToken);
-        return await XDocument.LoadAsync(contentStream, xmlLoadOptions, cancellationToken);
+        await using Stream contentStream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return await XDocument.LoadAsync(contentStream, xmlLoadOptions, cancellationToken).ConfigureAwait(false);
     }
 
     // public static async Task<T?> readFromXmlAsync<T>(this HttpContent content, CancellationToken cancellationToken = default) {
