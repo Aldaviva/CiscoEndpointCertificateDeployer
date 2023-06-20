@@ -137,11 +137,11 @@ public class WebSocketXapi: IXapiTransport {
         return Task.CompletedTask;
     }
 
-    public async Task<T> getConfigurationOrStatus<T>(string[] path) {
+    public async Task<T> GetConfigurationOrStatus<T>(string[] path) {
         throw new NotImplementedException();
     }
 
-    public async Task setConfiguration(string[] path, object newValue) {
+    public async Task SetConfiguration(string[] path, object newValue) {
         throw new NotImplementedException();
     }
 

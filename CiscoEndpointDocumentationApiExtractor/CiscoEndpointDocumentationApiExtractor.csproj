@@ -6,7 +6,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <StartupObject>CiscoEndpointDocumentationApiExtractor.Extraction.Program</StartupObject>
-        <NoWarn>CS8524</NoWarn>
+        <NoWarn>CS8524, CS8846</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

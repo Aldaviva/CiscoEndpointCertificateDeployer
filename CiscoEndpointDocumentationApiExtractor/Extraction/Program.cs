@@ -19,6 +19,7 @@ internal class Program {
         // Main2(args);
         // return;
         ExtractedDocumentation docs = PdfParser.parsePdf(PDF_FILENAME);
+        new Fixes(docs).fix();
         await new CsClientWriter().writeClient(docs);
     }
 

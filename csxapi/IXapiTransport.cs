@@ -9,9 +9,9 @@ public interface IXapiTransport: IDisposable, IAsyncDisposable {
 
     Task SignOut();
 
-    Task<T> getConfigurationOrStatus<T>(string[] path);
+    Task<T> GetConfigurationOrStatus<T>(string[] path);
 
-    Task setConfiguration(string[] path, object newValue);
+    Task SetConfiguration(string[] path, object newValue);
 
     Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters);
 

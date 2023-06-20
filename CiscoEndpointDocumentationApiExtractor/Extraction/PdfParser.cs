@@ -209,7 +209,7 @@ public static class PdfParser {
                     _ when Regex.Match(statusValueSpace, @"^Off/(?<min>-?\d+)\.\.(?<max>-?\d+)$") is { Success: true } match => new IntValueSpace
                         { optionalValue = "Off", ranges = new List<IntRange> { new() { minimum = int.Parse(match.Groups["min"].Value), maximum = int.Parse(match.Groups["max"].Value) } } },
 
-                    _ => new EnumValueSpace { possibleValues = new HashSet<EnumValue> { new() { name = statusValueSpace } } }
+                    _ => new EnumValueSpace { possibleValues = new HashSet<EnumValue> { new(statusValueSpace) } }
                     // _ => throw new ParsingException(word, state, characterStyle, page, "Could not parse xStatus returned value space " + statusValueSpace)
                 };
 
@@ -306,19 +306,19 @@ public static class PdfParser {
                         if (command is DocXConfiguration xConfiguration) {
                             if (Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
                                 IntParameter indexParameter = new() {
-                                    arrayIndexItemParameterPosition = parameterUsageIndex,
-                                    required                        = true,
-                                    name                            = match.Groups["name"].Value,
-                                    namePrefix                      = match.Groups["prefix"].Value.EmptyToNull()
+                                    indexOfParameterInName = parameterUsageIndex,
+                                    required               = true,
+                                    name                   = match.Groups["name"].Value,
+                                    namePrefix             = match.Groups["prefix"].Value.EmptyToNull()
                                 };
                                 xConfiguration.parameters.Add(indexParameter);
                                 requiredParameters.Add(indexParameter.name);
                             } else if (Regex.Match(word.Text, @"^\[(?<min>-?\d+)\.\.(?<max>-?\d+)\]$") is { Success: true } match2) {
                                 IntParameter channelParameter = new() {
-                                    arrayIndexItemParameterPosition = parameterUsageIndex,
-                                    required                        = true,
-                                    name                            = previousWord!.Text,
-                                    ranges                          = { new IntRange { minimum = int.Parse(match2.Groups["min"].Value), maximum = int.Parse(match2.Groups["max"].Value) } }
+                                    indexOfParameterInName = parameterUsageIndex,
+                                    required               = true,
+                                    name                   = previousWord!.Text,
+                                    ranges                 = { new IntRange { minimum = int.Parse(match2.Groups["min"].Value), maximum = int.Parse(match2.Groups["max"].Value) } }
                                 };
                                 xConfiguration.parameters.Add(channelParameter);
                                 requiredParameters.Add(channelParameter.name);
@@ -343,7 +343,7 @@ public static class PdfParser {
                             parameterUsageIndex++;
                             break;
                         case ParserState.USAGE_PARAMETER_NAME or ParserState.VALUESPACE_TERM_DEFINITION when command is DocXConfiguration xConfiguration &&
-                            xConfiguration.parameters.FirstOrDefault(p => word.Text == p.name + ':' && (p as IntParameter)?.arrayIndexItemParameterPosition is not null) is { } _positionalParam:
+                            xConfiguration.parameters.FirstOrDefault(p => word.Text == p.name + ':' && (p as IntParameter)?.indexOfParameterInName is not null) is { } _positionalParam:
                             parameter = _positionalParam;
                             state     = ParserState.USAGE_PARAMETER_DESCRIPTION;
                             break;
@@ -708,13 +708,13 @@ public static class PdfParser {
             allValues = split.Insert(intermediateValues, ellipsisIndex);
         }
 
-        return Enumerable.ToHashSet(allValues.Select(s => new EnumValue { name = s }));
+        return Enumerable.ToHashSet(allValues.Select(s => new EnumValue(s)));
     }
 
     private static ISet<EnumValue> parseEnumValueSpacePossibleValues(string enumList, string delimiter = "/") =>
         parseEnumValueSpacePossibleValues(enumList.TrimEnd(')').Split(delimiter, StringSplitOptions.RemoveEmptyEntries));
 
-    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(IEnumerable<string> enumList) => Enumerable.ToHashSet(enumList.Select(value => new EnumValue { name = value }));
+    private static ISet<EnumValue> parseEnumValueSpacePossibleValues(IEnumerable<string> enumList) => Enumerable.ToHashSet(enumList.Select(value => new EnumValue(value)));
 
     private static string appendWord(string? head, Word tail, double? previousWordBaseline) {
         double baselineDifference = getBaselineDifference(tail, previousWordBaseline);

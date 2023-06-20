@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
@@ -14,6 +15,7 @@ public class ExtractedDocumentation {
 public abstract class AbstractCommand {
 
     public IList<string> name { get; set; } = new List<string>();
+    public virtual IList<string> nameWithoutParameters => name;
     public ISet<Product> appliesTo { get; set; } = new HashSet<Product>();
     public ISet<UserRole> requiresUserRole { get; set; } = new HashSet<UserRole>();
     public string description { get; set; } = string.Empty;
@@ -59,6 +61,9 @@ public class DocXConfiguration: AbstractCommand {
 
     public ICollection<Parameter> parameters { get; set; } = new List<Parameter>();
 
+    public override IList<string> nameWithoutParameters =>
+        name.Where((s, i) => !parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+
 }
 
 public abstract class Parameter {
@@ -84,7 +89,7 @@ public enum DataType {
 
 public class IntParameter: Parameter {
 
-    public int? arrayIndexItemParameterPosition { get; set; }
+    public int? indexOfParameterInName { get; set; }
     public ICollection<IntRange> ranges { get; set; } = new List<IntRange>();
     public override DataType type => DataType.INTEGER;
     public string? namePrefix { get; set; }
@@ -99,6 +104,10 @@ internal class EnumParameter: Parameter, EnumValues {
 }
 
 internal class EnumValue {
+
+    public EnumValue(string name) {
+        this.name = name;
+    }
 
     public string name { get; set; } = default!;
     public string? description { get; set; }
