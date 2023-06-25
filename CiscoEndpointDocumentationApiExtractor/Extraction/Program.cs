@@ -13,7 +13,7 @@ namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 internal class Program {
 
-    private const string PDF_FILENAME = @"c:\Users\Ben\Documents\Work\Blue Jeans\Cisco in-room controls for Verizon\api-reference-guide-roomos-111.pdf";
+    private const string PDF_FILENAME = @"..\..\..\Documentation\11.1.pdf";
 
     public static async Task Main(string[] args) {
         // Main2(args);
@@ -26,11 +26,11 @@ internal class Program {
     private static void Main2(string[] args) {
         using PdfDocument pdf = PdfDocument.Open(PDF_FILENAME);
 
-        Page page = pdf.GetPage(233);
+        Page page = pdf.GetPage(62);
 
         IWordExtractor wordExtractor = DefaultWordExtractor.Instance;
         IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
-            .Where(letter => PdfParser.isTextOnHalfOfPage(letter, page, false))
+            .Where(letter => PdfParser.isTextOnHalfOfPage(letter, page, true))
             /*.Select(letter => letter switch {
                 { Value: "\"", PointSize: 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT") => new Letter(
                     letter.Value,

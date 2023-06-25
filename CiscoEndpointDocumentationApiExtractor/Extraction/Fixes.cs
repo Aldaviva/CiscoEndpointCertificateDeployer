@@ -24,6 +24,20 @@ public class Fixes {
         setConfigurationValueSpace("xConfiguration Video Output Connector [n] HDCPPolicy", "Off", "On");
         setConfigurationValueSpace("xConfiguration Video Output Connector [n] Resolution", "Auto", "1920_1080_50", "1920_1080_60", "1920_1200_50", "1920_1200_60", "2560_1440_60", "3840_2160_30",
             "3840_2160_60");
+
+        foreach (DocXStatus naStatus in documentation.statuses.Where(status => status.description == "Not applicable in this release.")) {
+            naStatus.returnValueSpace = new StringValueSpace();
+        }
+
+        foreach (DocXStatus multiParameterStatus in documentation.statuses.Where(status => status.arrayIndexParameters.Count >= 2)) {
+            int nIndex = 1;
+            foreach (IntParameter parameter in multiParameterStatus.arrayIndexParameters.Where(parameter => parameter.name == "n")) {
+                if (nIndex > 1) {
+                    parameter.name += nIndex;
+                }
+                nIndex++;
+            }
+        }
     }
 
     private void setConfigurationValueSpace(string path, params string[] values) {

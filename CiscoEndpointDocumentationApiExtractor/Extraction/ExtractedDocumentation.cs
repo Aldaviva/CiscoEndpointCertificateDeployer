@@ -38,22 +38,23 @@ public enum UserRole {
 
 public enum Product {
 
-    SX80,
-    SX20,
-    SX10,
-    MX700_MX800_MX800D,
-    MX200G2_MX300G2,
-    CODECPRO,
-    CODECPLUS,
-    ROOM70G2,
-    ROOM70_ROOM55D,
-    ROOM55,
-    ROOMKIT,
-    ROOMKITMINI,
-    ROOMPANORAMA_ROOM70PANORAMA,
-    DX70_DX80,
-    DESKPRO,
-    BOARDS
+    Board,
+    BoardPro,
+    CodecEQ,
+    CodecPlus,
+    CodecPro,
+    DeskPro,
+    DeskMini,
+    Desk,
+    Room55,
+    Room70,
+    Room55D,
+    Room70G2,
+    RoomBar,
+    RoomKit,
+    RoomKitMini,
+    RoomPanorama,
+    Room70Panorama
 
 }
 
@@ -149,19 +150,13 @@ public class DocXCommand: DocXConfiguration { }
 
 public class DocXStatus: AbstractCommand {
 
-    public ICollection<IntParameter> arrayIndexParameters { get; set; } = new List<IntParameter>();
+    public ICollection<IntParameter> arrayIndexParameters { get; } = new List<IntParameter>();
     public ValueSpace returnValueSpace { get; set; } = default!;
 
+    public override IList<string> nameWithoutParameters =>
+        name.Where((s, i) => !arrayIndexParameters.Any(parameter => parameter is { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+
 }
-
-/*
- internal abstract class ValueSpace { }
-
-internal abstract class ValueSpace<T>: ValueSpace {
-
-    public abstract DataType type { get; }
-
-}*/
 
 public abstract class ValueSpace {
 

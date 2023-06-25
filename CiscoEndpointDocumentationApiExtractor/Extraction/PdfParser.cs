@@ -8,6 +8,7 @@ using MoreLinq;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Graphics.Colors;
 using UglyToad.PdfPig.Outline;
 using UglyToad.PdfPig.Util;
 
@@ -18,6 +19,7 @@ public static class PdfParser {
     private const int DPI = 72;
 
     private static readonly ISet<string> XSTATUS_DESCRIPTION_VALUE_SPACE_HEADING_WORDS = new HashSet<string> { "Value", "space", "of", "the", "result", "returned:" };
+    private static readonly IColor     PRODUCT_NAME_COLOR                            = new RGBColor(0.035m, 0.376m, 0.439m);
 
     public static void Main() {
         // Console.WriteLine(string.Join("\n", guessEnumRange("Microphone.1/../Microphone.4/Line.1/Line.2/HDMI.2".Split('/')).Select(value => value.name)));
@@ -249,11 +251,27 @@ public static class PdfParser {
                         resetMethodParsingState();
                     }
 
+                    if (state == ParserState.METHOD_NAME_HEADING && command is DocXStatus xStatus && Regex.Match(word.Text, @"\[(?<name>[a-z])\]") is { Success: true } match2) {
+                        IntParameter indexParameter = new() {
+                            indexOfParameterInName = command.name.Count,
+                            required               = true,
+                            name                   = match2.Groups["name"].Value // can be duplicated even in one method
+                        };
+                        xStatus.arrayIndexParameters.Add(indexParameter);
+                        requiredParameters.Add(indexParameter.name);
+                    }
+
                     state = ParserState.METHOD_NAME_HEADING;
                     command.name.Add(word.Text);
                     break;
                 case CharacterStyle.PRODUCT_NAME:
                     switch (state) {
+                        case ParserState.METHOD_NAME_HEADING when word.Text == "Applies":
+                            state = ParserState.APPLIES_TO;
+                            break;
+                        case ParserState.APPLIES_TO when word.Text == "to:":
+                            state = ParserState.APPLIES_TO_PRODUCTS;
+                            break;
                         case ParserState.APPLIES_TO or ParserState.APPLIES_TO_PRODUCTS:
                             state = ParserState.APPLIES_TO_PRODUCTS;
                             string productName = (partialProductName ?? string.Empty) + word.Text;
@@ -303,8 +321,8 @@ public static class PdfParser {
                     break;
                 case CharacterStyle.USAGE_EXAMPLE:
                     if (state == ParserState.USAGE_EXAMPLE) {
-                        if (command is DocXConfiguration xConfiguration) {
-                            if (Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match) {
+                        switch (command) {
+                            case DocXConfiguration xConfiguration when Regex.Match(word.Text, @"^(?<prefix>\w*)\[(?<name>\w+)\]$") is { Success: true } match: {
                                 IntParameter indexParameter = new() {
                                     indexOfParameterInName = parameterUsageIndex,
                                     required               = true,
@@ -313,17 +331,20 @@ public static class PdfParser {
                                 };
                                 xConfiguration.parameters.Add(indexParameter);
                                 requiredParameters.Add(indexParameter.name);
-                            } else if (Regex.Match(word.Text, @"^\[(?<min>-?\d+)\.\.(?<max>-?\d+)\]$") is { Success: true } match2) {
+                                break;
+                            }
+                            case DocXConfiguration xConfiguration when Regex.Match(word.Text, @"^\[(?<min>-?\d+)\.\.(?<max>-?\d+)\]$") is { Success: true } match: {
                                 IntParameter channelParameter = new() {
                                     indexOfParameterInName = parameterUsageIndex,
                                     required               = true,
                                     name                   = previousWord!.Text,
-                                    ranges                 = { new IntRange { minimum = int.Parse(match2.Groups["min"].Value), maximum = int.Parse(match2.Groups["max"].Value) } }
+                                    ranges                 = { new IntRange { minimum = int.Parse(match.Groups["min"].Value), maximum = int.Parse(match.Groups["max"].Value) } }
                                 };
                                 xConfiguration.parameters.Add(channelParameter);
                                 requiredParameters.Add(channelParameter.name);
-                            }
 
+                                break;
+                            }
                         }
 
                         parameterUsageIndex++;
@@ -365,8 +386,9 @@ public static class PdfParser {
                     break;
                 case CharacterStyle.VALUESPACE_OR_DISCLAIMER:
                     switch (state) {
-                        case ParserState.REQUIRES_USER_ROLE:
+                        case ParserState.APPLIES_TO_PRODUCTS or ParserState.REQUIRES_USER_ROLE:
                             // ignore the "Not available for the Webex Devices Cloud xAPI service on personal mode devices" disclaimer
+                            state = ParserState.REQUIRES_USER_ROLE;
                             break;
                         case ParserState.VALUESPACE when command is DocXStatus:
                             statusValueSpace = appendWord(statusValueSpace, word, previousWordBaseline);
@@ -546,8 +568,12 @@ public static class PdfParser {
                         case ParserState.APPLIES_TO when word.Text == "Requires":
                             state = ParserState.REQUIRES_USER_ROLE;
                             break;
-                        case ParserState.APPLIES_TO_PRODUCTS:
+                        case ParserState.APPLIES_TO_PRODUCTS when word.Text == "Requires":
                             state = ParserState.REQUIRES_USER_ROLE;
+                            break;
+                        case ParserState.APPLIES_TO_PRODUCTS:
+                            command.description = appendWord(command.description, word, previousWordBaseline);
+                            state               = ParserState.DESCRIPTION;
                             break;
                         case ParserState.REQUIRES_USER_ROLE when word.Text is "role:":
                             state = ParserState.REQUIRES_USER_ROLE_ROLES;
@@ -782,18 +808,19 @@ public static class PdfParser {
         return bookmarksInSection.First().PageNumber..bookmarksInSection.Last().PageNumber;
     }
 
-    internal static CharacterStyle getCharacterStyle(Word word) =>
-        getFirstNonQuotationMarkLetter(word.Letters) switch {
-            { PointSize: 16.0 }                                                                              => CharacterStyle.METHOD_FAMILY_HEADING,
-            { PointSize: 10.0 }                                                                              => CharacterStyle.METHOD_NAME_HEADING,
-            { PointSize: 6.0 }                                                                               => CharacterStyle.PRODUCT_NAME,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans")                   => CharacterStyle.USAGE_HEADING,
-            { PointSize: 8.8 or 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT")       => CharacterStyle.USAGE_EXAMPLE,
-            { PointSize: 8.8, FontName: var fontName } when fontName.EndsWith("CourierNewPS-ItalicMT")       => CharacterStyle.PARAMETER_NAME,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-ExtraLightOblique") => CharacterStyle.VALUESPACE_OR_DISCLAIMER,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-Oblique")           => CharacterStyle.VALUESPACE_TERM,
-            _                                                                                                => CharacterStyle.BODY
+    internal static CharacterStyle getCharacterStyle(Word word) {
+        return getFirstNonQuotationMarkLetter(word.Letters) switch {
+            { PointSize: 16.0 }                                                                                                                            => CharacterStyle.METHOD_FAMILY_HEADING,
+            { PointSize: 10.0 }                                                                                                                            => CharacterStyle.METHOD_NAME_HEADING,
+            { FontName: var fontName, Color: var color } when fontName.EndsWith("CiscoSans-Oblique") && color.Equals(PRODUCT_NAME_COLOR) => CharacterStyle.PRODUCT_NAME,
+            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans")                                                                 => CharacterStyle.USAGE_HEADING,
+            { PointSize: 8.8 or 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT")                                                     => CharacterStyle.USAGE_EXAMPLE,
+            { PointSize: 8.8, FontName: var fontName } when fontName.EndsWith("CourierNewPS-ItalicMT")                                                     => CharacterStyle.PARAMETER_NAME,
+            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-ExtraLightOblique")                                               => CharacterStyle.VALUESPACE_OR_DISCLAIMER,
+            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-Oblique")                                                         => CharacterStyle.VALUESPACE_TERM,
+            _                                                                                                                                              => CharacterStyle.BODY
         };
+    }
 
     private static T? parseEnum<T>(string text) where T: struct, Enum => Enum.IsDefined(typeof(T), text) && Enum.TryParse(text, true, out T result) ? result : null;
 

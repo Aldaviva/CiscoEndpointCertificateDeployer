@@ -61,21 +61,15 @@ public class WebSocketXapi: IXapiTransport {
         _feedbackCallbacks[Id](Event ?? Status ?? Configuration!);
     }
 
-    public Task<T> Get<T>(params string[] path) => Get<T>((object[]) path);
-
-    public Task<T> Get<T>(params object[] path) {
+    public Task<T> Get<T>(params string[] path) {
         return _jsonRpc.InvokeWithParameterObjectAsync<T>("xGet", new { Path = path });
     }
 
-    public Task<T> Query<T>(params string[] path) => Query<T>((object[]) path);
-
-    public Task<T> Query<T>(params object[] path) {
+    public Task<T> Query<T>(params string[] path) {
         return _jsonRpc.InvokeWithParameterObjectAsync<T>("xQuery", new { Path = path });
     }
 
-    public Task<bool> Set(IEnumerable<string> path, object value) => Set((object[]) path, value);
-
-    public Task<bool> Set(IEnumerable<object> path, object value) {
+    public Task<bool> Set(IEnumerable<string> path, object value) {
         return _jsonRpc.InvokeWithParameterObjectAsync<bool>("xSet", new { Path = path, Value = value });
     }
 
@@ -94,22 +88,19 @@ public class WebSocketXapi: IXapiTransport {
         return method;
     }
 
-    public Task<long> Subscribe<T>(string[] path, Action<T>       callback, bool notifyCurrentValue = false) => Subscribe((object[]) path, callback, notifyCurrentValue);
-    public Task<long> Subscribe(string[]    path, Action<JObject> callback, bool notifyCurrentValue = false) => Subscribe((object[]) path, callback, notifyCurrentValue);
-
-    public async Task<long> Subscribe<T>(IEnumerable<object> path, Action<T> callback, bool notifyCurrentValue = false) {
+    public async Task<long> Subscribe<T>(IEnumerable<string> path, Action<T> callback, bool notifyCurrentValue = false) {
         long id = await Subscribe(path, notifyCurrentValue).ConfigureAwait(false);
         _feedbackCallbacks[id] = jobject => { callback(jobject.ToObject<T>()!); };
         return id;
     }
 
-    public async Task<long> Subscribe(IEnumerable<object> path, Action<JObject> callback, bool notifyCurrentValue = false) {
+    public async Task<long> Subscribe(IEnumerable<string> path, Action<JObject> callback, bool notifyCurrentValue = false) {
         long id = await Subscribe(path, notifyCurrentValue).ConfigureAwait(false);
         _feedbackCallbacks[id] = callback;
         return id;
     }
 
-    private async Task<long> Subscribe(IEnumerable<object> path, bool notifyCurrentValue = false) {
+    private async Task<long> Subscribe(IEnumerable<string> path, bool notifyCurrentValue = false) {
         IDictionary<string, object> subscription = await _jsonRpc
             .InvokeWithParameterObjectAsync<IDictionary<string, object>>("xFeedback/Subscribe", new { Query = path, NotifyCurrentValue = notifyCurrentValue }).ConfigureAwait(false);
         return (long) subscription["Id"];
@@ -145,7 +136,7 @@ public class WebSocketXapi: IXapiTransport {
         throw new NotImplementedException();
     }
 
-    public async Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object> parameters) {
+    public async Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters) {
         await Command(path, parameters).ConfigureAwait(false);
         // TODO figure out how we want to handle returning either JSON or XML from different XapiTransport subclasses
         return new XElement("todo");

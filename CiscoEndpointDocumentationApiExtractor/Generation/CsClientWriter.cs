@@ -2,9 +2,11 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using CiscoEndpointDocumentationApiExtractor.Extraction;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
@@ -33,6 +35,7 @@ public class CsClientWriter {
     public async Task writeClient(ExtractedDocumentation documentation) {
         await writeConfiguration(documentation);
         await writeCommands(documentation);
+        await writeStatuses(documentation);
         await writeEnums(documentation);
     }
 
@@ -65,14 +68,15 @@ public class CsClientWriter {
             foreach (InterfaceChild interfaceChild in interfaceNode.Value) {
                 switch (interfaceChild) {
                     case InterfaceMethod { command: DocXCommand command }:
+                        (string signature, string returnType) methodSignature = generateMethodSignature(command, true);
                         await icommandsWriter.WriteAsync($"""
                 /// <summary>
                 /// <para><c>{string.Join(' ', command.name)}</c></para>
                 /// {command.description.NewLinesToParagraphs()}
                 /// </summary>
             {string.Join("\r\n", command.parameters.Select(param => $"    /// <param name=\"{getArgumentName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
-                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>
-                {generateMethodSignature(command, true)};
+                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>)
+                {methodSignature.signature};
 
 
             """);
@@ -107,7 +111,7 @@ public class CsClientWriter {
         foreach (DocXCommand command in documentation.commands) {
 
             await commandsWriter.WriteAsync("    /// <inheritdoc />\r\n    ");
-            await commandsWriter.WriteAsync(generateMethodSignature(command, false));
+            await commandsWriter.WriteAsync(generateMethodSignature(command, false).signature);
 
             string path = $"new[] {{ {string.Join(", ", command.name.Select(s => $"\"{s}\""))} }}";
             string parameters = command.parameters.Any()
@@ -152,11 +156,11 @@ public class CsClientWriter {
 
                 return $$"""
 
-                /// <summary>For use with <see cref="{{getInterfaceName(command)}}.{{command.nameWithoutParameters.Last()}}{{(command is DocXCommand ? "" : $"({string.Join(", ", command.parameters.Select(p => $"{p.type switch {
+                /// <summary>For use with <see cref="{{getInterfaceName(command)}}.{{command.nameWithoutParameters.Last()}}{{$"({string.Join(", ", command.parameters.OrderByDescending(p => p.required).Select(p => $"{p.type switch {
                     DataType.INTEGER => "int",
                     DataType.STRING  => "string",
                     DataType.ENUM    => getEnumName(command, p.name)
-                }}"))})")}}" /></summary>
+                }}{(p.required?"":"?")}"))})"}}" /></summary>
                 {{GENERATED_ATTRIBUTE}}
                 public enum {{enumTypeName}} {
 
@@ -168,7 +172,24 @@ public class CsClientWriter {
             })));
         }
 
+        foreach (DocXStatus xStatus in documentation.statuses.Where(status => status.returnValueSpace.type == DataType.ENUM)) {
+            EnumValueSpace valueSpace = (EnumValueSpace) xStatus.returnValueSpace;
+            string         enumTypeName   = getEnumName(xStatus);
+
+            await enumsWriter.WriteAsync($$"""
+
+                /// <summary>For use with <see cref="{{getInterfaceName(xStatus)}}.{{xStatus.nameWithoutParameters.Last()}}{{$"({string.Join(", ", xStatus.arrayIndexParameters.Select(p => "int"))})"}}" /></summary>
+                {{GENERATED_ATTRIBUTE}}
+                public enum {{enumTypeName}} {
+                
+                {{string.Join(",\r\n\r\n", valueSpace.possibleValues.Select(value => $"    /// <summary><para><c>{value.name}</c>{(value.description is not null ? ": " + value.description.NewLinesToParagraphs(true) : "")}</para></summary>\r\n    {xapiEnumValueToCsIdentifier(xStatus, null, value)}"))}}
+
+                }
+            
+                """ );
+        }
         await enumsWriter.WriteAsync($$"""
+
             {{GENERATED_ATTRIBUTE}}
             public static class EnumSerializer {
 
@@ -207,15 +228,33 @@ public class CsClientWriter {
                         return deserialized != null;
                     }
 
-
                 """;
             })));
         }
 
+        foreach (DocXStatus xStatus in documentation.statuses.Where(status => status.returnValueSpace.type == DataType.ENUM)) {
+            EnumValueSpace valueSpace   = (EnumValueSpace) xStatus.returnValueSpace;
+            string         enumTypeName = getEnumName(xStatus);
+
+            IEnumerable<string> deserializerSwitchArms =
+                valueSpace.possibleValues.Select(value => $"\"{value.name.ToLowerInvariant()}\" => {enumTypeName}.{xapiEnumValueToCsIdentifier(xStatus, null, value)}");
+
+            await enumsWriter.WriteAsync($$"""
+                    public static bool TryDeserialize(string serialized, [NotNullWhen(true)] out {{enumTypeName}}? deserialized) {
+                        deserialized = serialized.ToLowerInvariant() switch {
+                            {{string.Join(",\r\n            ", deserializerSwitchArms.Append("_ => null"))}}
+                        };
+                        return deserialized != null;
+                    }
+
+
+                """);
+        }
+
         await enumsWriter.WriteAsync("}");
 
-        static string xapiEnumValueToCsIdentifier(DocXConfiguration command, EnumParameter parameter, EnumValue value) {
-            bool   isTimeZone = command.name.SequenceEqual(new[] { "xConfiguration", "Time", "Zone" }) && parameter.name == "Zone";
+        static string xapiEnumValueToCsIdentifier(AbstractCommand command, EnumParameter? parameter, EnumValue value) {
+            bool   isTimeZone = command.name.SequenceEqual(new[] { "xConfiguration", "Time", "Zone" }) && parameter?.name == "Zone";
             string name       = isTimeZone ? value.name : string.Join(null, value.name.Split('-').Select(s => s.ToUpperFirstLetter()));
             name = Regex.Replace(name, @"[^a-z0-9_]", match => match.Value switch {
                 "."                                               => "_",
@@ -223,7 +262,7 @@ public class CsClientWriter {
                 "+" when isTimeZone                               => "_Plus_", //ႵᏐǂߙƚϯᵻᵼ
                 "-" when isTimeZone && value.name.Contains("GMT") => "_Minus_",
                 "-" when isTimeZone                               => "_",
-                _                                                 => string.Empty
+                _                                                 => ""
             }, RegexOptions.IgnoreCase).ToUpperFirstLetter();
             return char.IsLetter(name[0]) ? name : "_" + name;
         }
@@ -252,21 +291,24 @@ public class CsClientWriter {
             foreach (InterfaceChild interfaceChild in interfaceNode.Value) {
                 switch (interfaceChild) {
                     case InterfaceMethod { command: DocXConfiguration configuration } when configuration.parameters.Any():
+                        (string signature, string returnType) setterSignature = generateMethodSignature(configuration, true, true);
+                        (string signature, string returnType) getterSignature = generateMethodSignature(configuration, false, true);
                         await iconfigurationWriter.WriteAsync($"""
                                 /// <summary>
                                 /// <para><c>{string.Join(' ', configuration.name)}</c></para>
                                 /// {configuration.description.NewLinesToParagraphs()}
                                 /// </summary>
                             {string.Join("\r\n", configuration.parameters.Select(param => $"    /// <param name=\"{getArgumentName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
-                                /// <returns>A <see cref="Task"/> that will complete asynchronously when the configuration change has been received by the device.</returns>
-                                {generateMethodSignature(configuration, true, true)};
+                                /// <returns>A <see cref="Task"/> that will complete asynchronously when the configuration change has been received by the device.</returns>)
+                                {setterSignature.signature};
 
                                 /// <summary>
                                 /// <para><c>{string.Join(' ', configuration.name)}</c></para>
                                 /// {configuration.description.NewLinesToParagraphs()}
                                 /// </summary>
-                                /// <returns>A <see cref="Task&lt;String&gt;"/> that will complete asynchronously with the response from the device.</returns>
-                                {generateMethodSignature(configuration, false, true)};
+                            {string.Join("\r\n", configuration.parameters.Where(parameter => parameter is IntParameter{indexOfParameterInName:not null}).Select(param => $"    /// <param name=\"{getArgumentName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
+                                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>
+                                {getterSignature.signature};
 
 
                             """);
@@ -302,7 +344,7 @@ public class CsClientWriter {
             Parameter configurationParameter = command.parameters.Last();
 
             await configurationWriter.WriteAsync("    /// <inheritdoc />\r\n    ");
-            await configurationWriter.WriteAsync(generateMethodSignature(command, true, false));
+            await configurationWriter.WriteAsync(generateMethodSignature(command, true, false).signature);
 
             string path =
                 $"new[] {{ {string.Join(", ", command.name.Select((s, i) => command.parameters.OfType<IntParameter>().FirstOrDefault(parameter => parameter.indexOfParameterInName == i) is { } pathParameter ? $"{getArgumentName(pathParameter)}.ToString()" : $"\"{s}\""))} }}";
@@ -316,7 +358,7 @@ public class CsClientWriter {
                 """);
 
             await configurationWriter.WriteAsync("    /// <inheritdoc />\r\n    ");
-            await configurationWriter.WriteAsync(generateMethodSignature(command, false, false));
+            await configurationWriter.WriteAsync(generateMethodSignature(command, false, false).signature);
 
             string autoDeserializedType = configurationParameter.type == DataType.INTEGER ? "int" : "string";
             string remoteCallExpression = $"await transport.GetConfigurationOrStatus<{autoDeserializedType}>({path}).ConfigureAwait(false)";
@@ -331,7 +373,7 @@ public class CsClientWriter {
                 """
                 : $"return {remoteCallExpression};");
 
-            await configurationWriter.WriteAsync("\r\n    }\r\n\r\n    ");
+            await configurationWriter.WriteAsync("\r\n    }\r\n\r\n");
 
         }
 
@@ -342,6 +384,102 @@ public class CsClientWriter {
         }
 
         await configurationWriter.WriteAsync("}");
+    }
+
+    private async Task writeStatuses(ExtractedDocumentation documentation) {
+        await using StreamWriter statusWriter  = openFileStream("Status.cs");
+        await using StreamWriter istatusWriter = openFileStream("IStatus.cs");
+
+        IDictionary<string, ISet<InterfaceChild>> interfaceTree = generateInterfaceTree(documentation.statuses);
+
+        await istatusWriter.WriteAsync($"""
+            {FILE_HEADER}
+
+            using System.CodeDom.Compiler;
+            using System.Xml.Linq;
+            
+            namespace {NAMESPACE};
+
+
+            """);
+
+        foreach (KeyValuePair<string, ISet<InterfaceChild>> interfaceNode in interfaceTree) {
+            await istatusWriter.WriteAsync($"{GENERATED_ATTRIBUTE}\r\npublic interface {interfaceNode.Key} {{\r\n\r\n");
+
+            foreach (InterfaceChild interfaceChild in interfaceNode.Value) {
+                switch (interfaceChild) {
+                    case InterfaceMethod { command: DocXStatus status }:
+                        (string signature, string returnType) methodSignature = generateMethodSignature(status, true);
+                        await istatusWriter.WriteAsync($"""
+                                /// <summary>
+                                /// <para><c>{string.Join(' ', status.name)}</c></para>
+                                /// {status.description.NewLinesToParagraphs()}
+                                /// </summary>
+                            {string.Join("\r\n", status.arrayIndexParameters.Select(param => $"    /// <param name=\"{getArgumentName(param, true)}\">{param.description.NewLinesToParagraphs()}</param>"))}
+                                /// <returns>A <see cref="Task&lt;T&gt;"/> that will complete asynchronously with the response from the device.</returns>)
+                                {methodSignature.signature};
+
+
+                            """);
+                        break;
+
+                    case Subinterface s:
+                        await istatusWriter.WriteAsync($"    {s.interfaceName} {s.getterName} {{ get; }}\r\n\r\n");
+                        break;
+                }
+            }
+
+            await istatusWriter.WriteAsync("}\r\n\r\n");
+        }
+
+        await statusWriter.WriteAsync($$"""
+            {{FILE_HEADER}}
+
+            using {{NAMESPACE}}.Enums;
+            using System.CodeDom.Compiler;
+            using System.Xml.Linq;
+
+            namespace {{NAMESPACE}};
+
+            {{GENERATED_ATTRIBUTE}}
+            public class Status: {{string.Join(", ", interfaceTree.Keys)}} {
+
+                private IXapiTransport transport;
+
+
+            """);
+
+        foreach (DocXStatus xStatus in documentation.statuses) {
+            await statusWriter.WriteAsync("    /// <inheritdoc />\r\n    ");
+            await statusWriter.WriteAsync(generateMethodSignature(xStatus, false).signature);
+
+            string path =
+                $"new[] {{ {string.Join(", ", xStatus.name.Select((s, i) => xStatus.arrayIndexParameters.FirstOrDefault(parameter => parameter.indexOfParameterInName == i) is { } pathParameter ? $"{getArgumentName(pathParameter)}.ToString()" : $"\"{s}\""))} }}";
+
+            string autoDeserializedType = xStatus.returnValueSpace.type == DataType.INTEGER ? "int" : "string";
+            string remoteCallExpression = $"await transport.GetConfigurationOrStatus<{autoDeserializedType}>({path}).ConfigureAwait(false)";
+            await statusWriter.WriteAsync(" {\r\n");
+
+            await statusWriter.WriteAsync(xStatus.returnValueSpace.type == DataType.ENUM
+                ? $$"""
+                        string serialized = {{remoteCallExpression}};
+                        return EnumSerializer.TryDeserialize(serialized, out {{NAMESPACE}}.Enums.{{getEnumName(xStatus)}}? deserialized)
+                            ? deserialized.Value
+                            : throw new ArgumentOutOfRangeException($"Failed to deserialize {{getEnumName(xStatus)}} enum value from string \"{serialized}\" from response to {{string.Join(' ', xStatus.name)}}");
+                """
+                : $"        return {remoteCallExpression};");
+
+            await statusWriter.WriteAsync("\r\n    }\r\n\r\n");
+        }
+
+        
+        foreach (KeyValuePair<string, ISet<InterfaceChild>> interfaceNode in interfaceTree) {
+            foreach (Subinterface subinterface in interfaceNode.Value.OfType<Subinterface>()) {
+                await statusWriter.WriteAsync($"    {subinterface.interfaceName} {interfaceNode.Key}.{subinterface.getterName} => this;\r\n");
+            }
+        }
+
+        await statusWriter.WriteAsync("}");
     }
 
     private static IDictionary<string, ISet<InterfaceChild>> generateInterfaceTree(IEnumerable<AbstractCommand> documentation) {
@@ -369,32 +507,58 @@ public class CsClientWriter {
         return interfaceTree;
     }
 
-    private static string generateMethodSignature(DocXCommand command, bool isInterfaceMethod) =>
-        $"{(isInterfaceMethod ? string.Empty : "async ")}Task<XElement> {(isInterfaceMethod ? string.Empty : getInterfaceName(command) + '.')}{command.nameWithoutParameters.Last()}({string.Join(", ", command.parameters.OrderByDescending(parameter => parameter.required).Select(parameter => $"{parameter.type switch {
-            DataType.INTEGER => "int",
-            DataType.STRING  => "string",
-            DataType.ENUM    => NAMESPACE + ".Enums." + getEnumName(command, parameter.name)
-        }}{(parameter.required ? string.Empty : "?")} {getArgumentName(parameter)}{(parameter.required || !isInterfaceMethod ? string.Empty : " = null")}"))})";
+    private static (string signature, string returnType) generateMethodSignature(DocXCommand command, bool isInterfaceMethod) {
+        const string RETURN_TYPE = "XElement";
+        return
+            ($"{(isInterfaceMethod ? "" : "async ")}Task<XElement> {(isInterfaceMethod ? "" : getInterfaceName(command) + '.')}{command.nameWithoutParameters.Last()}({string.Join(", ", command.parameters.OrderByDescending(parameter => parameter.required).Select(parameter => $"{parameter.type switch {
+                DataType.INTEGER => "int",
+                DataType.STRING  => "string",
+                DataType.ENUM    => NAMESPACE + ".Enums." + getEnumName(command, parameter.name)
+            }}{(parameter.required ? "" : "?")} {getArgumentName(parameter)}{(parameter.required || !isInterfaceMethod ? "" : " = null")}"))})", RETURN_TYPE);
+    }
 
-    private static string generateMethodSignature(DocXConfiguration configuration, bool isSetter, bool isInterfaceMethod) =>
-        $"{(isInterfaceMethod ? string.Empty : "async ")}Task{(isSetter ? "" : "<"+configuration.parameters.Last() switch {
+    private static (string signature, string returnType) generateMethodSignature(DocXConfiguration configuration, bool isSetter, bool isInterfaceMethod) {
+        string returnType = $"Task{(isSetter ? "" : "<" + configuration.parameters.Last() switch {
             { type: DataType.STRING }               => "string",
             { type: DataType.INTEGER }              => "int",
             { type: DataType.ENUM, name: var name } => $"{NAMESPACE}.Enums.{getEnumName(configuration, name)}"
-        }+">")} {(isInterfaceMethod ? string.Empty : getInterfaceName(configuration) + '.')}{configuration.nameWithoutParameters.Last()}({string.Join(", ", configuration.parameters.SkipLast(isSetter ? 0 : 1).Select(parameter => $"{parameter.type switch {
-            DataType.INTEGER => "int",
-            DataType.STRING  => "string",
-            DataType.ENUM    => $"{NAMESPACE}.Enums.{getEnumName(configuration, parameter.name)}"
-        }} {getArgumentName(parameter)}"))})";
-
-    private static string getInterfaceName(AbstractCommand method) {
-        return "I" + string.Join(null, method.nameWithoutParameters.Skip(1)
-            .SkipLast(1)
-            .Append(method.nameWithoutParameters[0][1..] + 's')); //will need to be "es" for Statuses
+        } + ">")}";
+        return (
+            $"{(isInterfaceMethod ? "" : "async ")}{returnType} {(isInterfaceMethod ? "" : getInterfaceName(configuration) + '.')}{configuration.nameWithoutParameters.Last()}({string.Join(", ", configuration.parameters.SkipLast(isSetter ? 0 : 1).Select(parameter => $"{parameter.type switch {
+                DataType.INTEGER => "int",
+                DataType.STRING  => "string",
+                DataType.ENUM    => $"{NAMESPACE}.Enums.{getEnumName(configuration, parameter.name)}"
+            }} {getArgumentName(parameter)}"))})", returnType);
     }
 
-    private static string getEnumName(AbstractCommand command, string parameterName) {
-        return string.Join(null, command.nameWithoutParameters.Skip(1).Append(parameterName).DistinctConsecutive());
+    private static (string signature, string returnType) generateMethodSignature(DocXStatus status, bool isInterfaceMethod) {
+        string returnType = $"Task<{status.returnValueSpace.type switch {
+            DataType.INTEGER when status.returnValueSpace is IntValueSpace { optionalValue: not null } => "int?",
+            DataType.INTEGER                                                                           => "int",
+            DataType.STRING                                                                            => "string",
+            DataType.ENUM                                                                              => NAMESPACE + ".Enums." + getEnumName(status)
+        }}>";
+        return ($"{(isInterfaceMethod ? "" : "async ")}{returnType} {(isInterfaceMethod ? "" : getInterfaceName(status) + '.')}{status.nameWithoutParameters.Last()}({string.Join(", ", status.arrayIndexParameters.Select(parameter => $"int {getArgumentName(parameter)}"))})", returnType);
+    }
+
+    private static string getInterfaceName(AbstractCommand method) {
+        string singular = "I" + string.Join(null, method.nameWithoutParameters.Skip(1)
+            .SkipLast(1)
+            .Append(method.nameWithoutParameters[0][1..]));
+        return singular + (singular.EndsWith('s') ? "es" : "s");
+    }
+
+    private static string getEnumName(DocXStatus command) => getEnumName(command, null);
+
+    private static string getEnumName(DocXConfiguration command, string parameterName) => getEnumName((AbstractCommand) command, parameterName);
+
+    private static string getEnumName(AbstractCommand command, string? parameterName) {
+        IEnumerable<string> segments = command.nameWithoutParameters;
+        if (parameterName != null) {
+            segments = segments.Append(parameterName);
+        }
+
+        return string.Join(null, segments.DistinctConsecutive()).TrimStart('x');
     }
 
     private static string getArgumentName(Parameter param, bool forDocumentationXmlComment = false) {
@@ -406,76 +570,6 @@ public class CsClientWriter {
         }
 
         return name;
-    }
-
-    private interface InterfaceChild { }
-
-    private class InterfaceMethod: InterfaceChild {
-
-        public InterfaceMethod(AbstractCommand command) {
-            this.command = command;
-        }
-
-        public AbstractCommand command { get; }
-
-        private bool Equals(InterfaceMethod other) {
-            return command.Equals(other.command);
-        }
-
-        public override bool Equals(object? obj) {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != GetType()) return false;
-            return Equals((InterfaceMethod) obj);
-        }
-
-        public override int GetHashCode() {
-            return command.GetHashCode();
-        }
-
-        public static bool operator ==(InterfaceMethod? left, InterfaceMethod? right) {
-            return Equals(left, right);
-        }
-
-        public static bool operator !=(InterfaceMethod? left, InterfaceMethod? right) {
-            return !Equals(left, right);
-        }
-
-    }
-
-    private class Subinterface: InterfaceChild {
-
-        public Subinterface(string interfaceName, string getterName) {
-            this.interfaceName = interfaceName;
-            this.getterName    = getterName;
-        }
-
-        public string interfaceName { get; }
-        public string getterName { get; }
-
-        private bool Equals(Subinterface other) {
-            return interfaceName == other.interfaceName;
-        }
-
-        public override bool Equals(object? obj) {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != GetType()) return false;
-            return Equals((Subinterface) obj);
-        }
-
-        public override int GetHashCode() {
-            return interfaceName.GetHashCode();
-        }
-
-        public static bool operator ==(Subinterface? left, Subinterface? right) {
-            return Equals(left, right);
-        }
-
-        public static bool operator !=(Subinterface? left, Subinterface? right) {
-            return !Equals(left, right);
-        }
-
     }
 
 }
