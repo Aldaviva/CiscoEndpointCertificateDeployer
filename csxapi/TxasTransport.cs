@@ -152,14 +152,15 @@ public class TxasTransport: IXapiTransport {
 
     public Task SetConfiguration(string[] path, object newValue) => CallMethod(path.SkipLast(1), new Dictionary<string, object?> { { path.Last(), newValue.ToString()! } });
 
-    public async Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters = null) {
+    public async Task<IDictionary<string, object?>> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters = null) {
         using HttpResponseMessage response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Post, GetTxasUri()) {
             Content = new TxasRequestContent(CreateCommand(path, parameters))
         }).ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
-        XDocument responseDoc = await response.Content.ReadFromXmlAsync().ConfigureAwait(false);
-        return responseDoc.Root!.Elements().First();
+        IDictionary<string, object?> responseObject = await response.Content.ReadFromXmlAsync<IDictionary<string, object?>>().ConfigureAwait(false);
+        return responseObject;
+        // return responseDoc.Root!.Elements().First();
     }
 
 }

@@ -11,6 +11,7 @@ public class SampleUsage {
     public async Task Dial() {
         await _configuration.Conference.DefaultCall.Protocol(ConfigurationConferenceDefaultCallProtocol.Sip).ConfigureAwait(false);
         ConfigurationConferenceDefaultCallProtocol defaultCallProtocol = await _configuration.Conference.DefaultCall.Protocol().ConfigureAwait(false);
+        _configuration.Conference.DefaultCall.ProtocolChanged += value => Console.WriteLine($"Default signaling protocol changed to {value}");
 
         ConfigurationTimeZone z = ConfigurationTimeZone.America_Los_Angeles;
 

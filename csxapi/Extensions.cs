@@ -1,8 +1,12 @@
-﻿using System.Xml.Linq;
+﻿using System.Collections.Concurrent;
+using System.Xml.Linq;
+using System.Xml.Serialization;
 
 namespace CSxAPI;
 
 internal static class Extensions {
+
+    private static readonly ConcurrentDictionary<Type, XmlSerializer> XmlSerializers = new();
 
     public static XElement? FindDescendentByElementNames(this XContainer ancestor, params string[] nestedChildrenNames) {
         string?   docNamespaceName = ancestor.Document?.Root?.Name.NamespaceName;
@@ -28,10 +32,10 @@ internal static class Extensions {
         return await XDocument.LoadAsync(contentStream, xmlLoadOptions, cancellationToken).ConfigureAwait(false);
     }
 
-    // public static async Task<T?> readFromXmlAsync<T>(this HttpContent content, CancellationToken cancellationToken = default) {
-    //     XmlSerializer      xmlSerializer = new(typeof(T));
-    //     await using Stream inputStream   = await content.ReadAsStreamAsync(cancellationToken);
-    //     return (T?) xmlSerializer.Deserialize(inputStream);
-    // }
+    public static async Task<T> ReadFromXmlAsync<T>(this HttpContent content, CancellationToken cancellationToken = default) {
+        XmlSerializer      xmlSerializer = XmlSerializers.GetOrAdd(typeof(T), type => new XmlSerializer(type));
+        await using Stream inputStream   = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        return (T) xmlSerializer.Deserialize(inputStream)!;
+    }
 
 }

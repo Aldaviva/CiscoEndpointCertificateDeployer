@@ -123,23 +123,16 @@ public class WebSocketXapi: IXapiTransport {
         return ValueTask.CompletedTask;
     }
 
-    public Task SignOut() {
-        // You don't sign out of WebSocket connections. If you want to stop using the connection, call Dispose() instead.
-        return Task.CompletedTask;
-    }
-
     public async Task<T> GetConfigurationOrStatus<T>(string[] path) {
-        throw new NotImplementedException();
+        return await Get<T>(path).ConfigureAwait(false);
     }
 
     public async Task SetConfiguration(string[] path, object newValue) {
-        throw new NotImplementedException();
+        await Set(path, newValue).ConfigureAwait(false);
     }
 
-    public async Task<XElement> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters) {
-        await Command(path, parameters).ConfigureAwait(false);
-        // TODO figure out how we want to handle returning either JSON or XML from different XapiTransport subclasses
-        return new XElement("todo");
+    public async Task<IDictionary<string, object?>> CallMethod(IEnumerable<string> path, IDictionary<string, object?>? parameters) {
+        return await Command<IDictionary<string, object?>>(path, parameters).ConfigureAwait(false);
     }
 
 }

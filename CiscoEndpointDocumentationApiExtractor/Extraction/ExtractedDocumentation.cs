@@ -15,7 +15,7 @@ public class ExtractedDocumentation {
 public abstract class AbstractCommand {
 
     public IList<string> name { get; set; } = new List<string>();
-    public virtual IList<string> nameWithoutParameters => name;
+    public virtual IList<string> nameWithoutBrackets => name;
     public ISet<Product> appliesTo { get; set; } = new HashSet<Product>();
     public ISet<UserRole> requiresUserRole { get; set; } = new HashSet<UserRole>();
     public string description { get; set; } = string.Empty;
@@ -62,8 +62,9 @@ public class DocXConfiguration: AbstractCommand {
 
     public ICollection<Parameter> parameters { get; set; } = new List<Parameter>();
 
-    public override IList<string> nameWithoutParameters =>
-        name.Where((s, i) => !parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+    public override IList<string> nameWithoutBrackets =>
+        // name.Where((s, i) => !parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+        name.Select((s, i) => parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i) ? "N" : s).ToList();
 
 }
 
@@ -153,8 +154,9 @@ public class DocXStatus: AbstractCommand {
     public ICollection<IntParameter> arrayIndexParameters { get; } = new List<IntParameter>();
     public ValueSpace returnValueSpace { get; set; } = default!;
 
-    public override IList<string> nameWithoutParameters =>
-        name.Where((s, i) => !arrayIndexParameters.Any(parameter => parameter is { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+    public override IList<string> nameWithoutBrackets =>
+        // name.Where((s, i) => !arrayIndexParameters.Any(parameter => parameter is { indexOfParameterInName: { } paramIndex } && paramIndex == i)).ToList();
+        name.Select((s, i) => arrayIndexParameters.Any(parameter => parameter is { indexOfParameterInName: { } paramIndex } && paramIndex == i) ? "N" : s).ToList();
 
 }
 
