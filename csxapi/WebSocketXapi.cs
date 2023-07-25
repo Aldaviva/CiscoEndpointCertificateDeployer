@@ -94,6 +94,12 @@ public class WebSocketXapi: IXapiTransport {
         return id;
     }
 
+    public async Task<long> Subscribe(IEnumerable<string> path, Action callback) {
+        long id = await Subscribe(path).ConfigureAwait(false);
+        _feedbackCallbacks[id] = _ => { callback(); };
+        return id;
+    }
+
     public async Task<long> Subscribe(IEnumerable<string> path, Action<JObject> callback, bool notifyCurrentValue = false) {
         long id = await Subscribe(path, notifyCurrentValue).ConfigureAwait(false);
         _feedbackCallbacks[id] = callback;

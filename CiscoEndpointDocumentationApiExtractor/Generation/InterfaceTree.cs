@@ -1,18 +1,19 @@
-﻿using CiscoEndpointDocumentationApiExtractor.Extraction;
+﻿using System;
+using CiscoEndpointDocumentationApiExtractor.Extraction;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
-public interface InterfaceChild { }
+public interface InterfaceChild<T> { }
 
-public class InterfaceMethod: InterfaceChild {
+public class InterfaceMethod<T>: InterfaceChild<T> {
 
-    public InterfaceMethod(AbstractCommand command) {
+    public InterfaceMethod(T command) {
         this.command = command;
     }
 
-    public AbstractCommand command { get; }
+    public T command { get; }
 
-    private bool Equals(InterfaceMethod other) {
+    private bool Equals(InterfaceMethod<T> other) {
         return command.Equals(other.command);
     }
 
@@ -20,24 +21,24 @@ public class InterfaceMethod: InterfaceChild {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
         if (obj.GetType() != GetType()) return false;
-        return Equals((InterfaceMethod) obj);
+        return Equals((InterfaceMethod<T>) obj);
     }
 
     public override int GetHashCode() {
         return command.GetHashCode();
     }
 
-    public static bool operator ==(InterfaceMethod? left, InterfaceMethod? right) {
+    public static bool operator ==(InterfaceMethod<T>? left, InterfaceMethod<T>? right) {
         return Equals(left, right);
     }
 
-    public static bool operator !=(InterfaceMethod? left, InterfaceMethod? right) {
+    public static bool operator !=(InterfaceMethod<T>? left, InterfaceMethod<T>? right) {
         return !Equals(left, right);
     }
 
 }
 
-public class Subinterface: InterfaceChild {
+public class Subinterface<T>: InterfaceChild<T> {
 
     public Subinterface(string interfaceName, string getterName) {
         this.interfaceName = interfaceName;
@@ -47,7 +48,7 @@ public class Subinterface: InterfaceChild {
     public string interfaceName { get; }
     public string getterName { get; }
 
-    private bool Equals(Subinterface other) {
+    private bool Equals(Subinterface<T> other) {
         return interfaceName == other.interfaceName;
     }
 
@@ -55,18 +56,18 @@ public class Subinterface: InterfaceChild {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
         if (obj.GetType() != GetType()) return false;
-        return Equals((Subinterface) obj);
+        return Equals((Subinterface<T>) obj);
     }
 
     public override int GetHashCode() {
         return interfaceName.GetHashCode();
     }
 
-    public static bool operator ==(Subinterface? left, Subinterface? right) {
+    public static bool operator ==(Subinterface<T>? left, Subinterface<T>? right) {
         return Equals(left, right);
     }
 
-    public static bool operator !=(Subinterface? left, Subinterface? right) {
+    public static bool operator !=(Subinterface<T>? left, Subinterface<T>? right) {
         return !Equals(left, right);
     }
 

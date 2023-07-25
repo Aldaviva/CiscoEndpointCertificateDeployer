@@ -35,8 +35,13 @@ public class Fixes {
                 if (nIndex > 1) {
                     parameter.name += nIndex;
                 }
+
                 nIndex++;
             }
+        }
+
+        foreach (DocXEvent xEvent in documentation.events.Where(xEvent => xEvent.children is [{ name: [.., "NameNotUsed"] }])) {
+            xEvent.children.Single().name[^1] = "Value";
         }
     }
 
@@ -51,12 +56,13 @@ public class Fixes {
         }
     }
 
-    private T? findCommand<T>(string path) where T: AbstractCommand {
+    private T? findCommand<T>(string path) where T: IPathNamed {
         IList<string> nameQuery = path.Split(" ");
         IList<T> collection = typeof(T) switch {
             var t when t == typeof(DocXCommand)       => (List<T>) documentation.commands,
             var t when t == typeof(DocXConfiguration) => (List<T>) documentation.configurations,
             var t when t == typeof(DocXStatus)        => (List<T>) documentation.statuses,
+            var t when t == typeof(DocXEvent)         => (List<T>) documentation.events
             // _                                         => null
         };
 

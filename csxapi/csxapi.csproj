@@ -25,7 +25,6 @@
 
     <ItemGroup>
         <EditorConfigFiles Remove="Generated\.editorconfig" />
-        <None Include="Generated\.editorconfig" />
     </ItemGroup>
 
 </Project>

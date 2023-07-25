@@ -31,3 +31,4 @@ _ReSharper*/
 #Nuget packages folder
 packages/
 /csxapi/Generated/**/*.cs
+/CiscoEndpointDocumentationApiExtractor/Documentation/event_*.xml

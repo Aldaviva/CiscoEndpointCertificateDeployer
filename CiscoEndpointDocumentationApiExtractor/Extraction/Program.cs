@@ -13,12 +13,20 @@ namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 internal class Program {
 
-    private const string PDF_FILENAME = @"..\..\..\Documentation\11.1.pdf";
+    private const string PDF_FILENAME       = @"..\..\..\Documentation\11.1.pdf";
+    private const string EVENT_XML_FILENAME = @"..\..\..\Documentation\event_11.5.xml";
 
     public static async Task Main(string[] args) {
         // Main2(args);
         // return;
-        ExtractedDocumentation docs = PdfParser.parsePdf(PDF_FILENAME);
+        ExtractedDocumentation docs = new();
+        // PdfParser.parsePdf(PDF_FILENAME, docs);
+        new EventReader(docs).parseEventXml(EVENT_XML_FILENAME);
+        // foreach (DocXEvent xEvent in docs.events.Where(xEvent => xEvent.access == EventAccess.PUBLIC_API)) {
+        //     Console.WriteLine($"*es {string.Join(' ', xEvent.name)}");
+        // }
+
+        // Console.WriteLine("** end\r\n");
         new Fixes(docs).fix();
         await CsClientWriter.writeClient(docs);
     }
@@ -30,7 +38,7 @@ internal class Program {
 
         IWordExtractor wordExtractor = DefaultWordExtractor.Instance;
         IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
-            .Where(letter => PdfParser.isTextOnHalfOfPage(letter, page, true))
+            .Where(letter => PdfReader.isTextOnHalfOfPage(letter, page, true))
             /*.Select(letter => letter switch {
                 { Value: "\"", PointSize: 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT") => new Letter(
                     letter.Value,
@@ -52,7 +60,7 @@ internal class Program {
             Letter firstLetter = textBlock.Letters[0];
             // Console.WriteLine(textBlock.Text);
             Console.WriteLine($@"{textBlock.Text}
-    character style = {PdfParser.getCharacterStyle(textBlock)}
+    character style = {PdfReader.getCharacterStyle(textBlock)}
     typeface = {firstLetter.Font.Name.Split('+', 2).Last()}
     point size = {firstLetter.PointSize:N3}
     italic = {firstLetter.Font.IsItalic}

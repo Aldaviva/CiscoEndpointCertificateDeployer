@@ -16,7 +16,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="Documentation\" />
         <Folder Include="Properties\" />
     </ItemGroup>
 
