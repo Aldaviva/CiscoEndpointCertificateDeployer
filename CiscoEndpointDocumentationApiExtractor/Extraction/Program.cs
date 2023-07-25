@@ -20,7 +20,7 @@ internal class Program {
         // Main2(args);
         // return;
         ExtractedDocumentation docs = new();
-        // PdfParser.parsePdf(PDF_FILENAME, docs);
+        PdfReader.parsePdf(PDF_FILENAME, docs);
         new EventReader(docs).parseEventXml(EVENT_XML_FILENAME);
         // foreach (DocXEvent xEvent in docs.events.Where(xEvent => xEvent.access == EventAccess.PUBLIC_API)) {
         //     Console.WriteLine($"*es {string.Join(' ', xEvent.name)}");

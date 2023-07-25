@@ -1,12 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CiscoEndpointDocumentationApiExtractor.Extraction;
-using static CiscoEndpointDocumentationApiExtractor.Txas.Commands;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
@@ -30,10 +29,19 @@ public partial class CsClientWriter {
     };
 
     public static async Task writeClient(ExtractedDocumentation documentation) {
-        // await writeConfiguration(documentation);
-        // await writeCommands(documentation);
-        // await writeStatuses(documentation);
+        Console.WriteLine("Generating xConfiguration client");
+        await writeConfiguration(documentation);
+
+        Console.WriteLine("Generating xCommand client");
+        await writeCommands(documentation);
+
+        Console.WriteLine("Generating xStatus client");
+        await writeStatuses(documentation);
+
+        Console.WriteLine("Generating xEvent client");
         await writeEvents(documentation);
+
+        Console.WriteLine("Generating enums");
         await writeEnums(documentation);
     }
 
@@ -43,7 +51,7 @@ public partial class CsClientWriter {
         return new StreamWriter(new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.Read), UTF8);
     }
 
-    private static IDictionary<string, ISet<InterfaceChild<T>>> generateInterfaceTree<T>(IEnumerable<T> documentation) where T:IPathNamed{
+    private static IDictionary<string, ISet<InterfaceChild<T>>> generateInterfaceTree<T>(IEnumerable<T> documentation) where T: IPathNamed {
         IDictionary<string, ISet<InterfaceChild<T>>> interfaceTree = new Dictionary<string, ISet<InterfaceChild<T>>>();
 
         foreach (T command in documentation) {

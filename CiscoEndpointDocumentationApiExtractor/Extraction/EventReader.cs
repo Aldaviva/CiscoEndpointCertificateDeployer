@@ -14,6 +14,7 @@ public class EventReader {
     }
 
     public void parseEventXml(string xmlFilename) {
+        Console.WriteLine("Parsing xEvent XML");
         XDocument doc = XDocument.Load(xmlFilename);
 
         foreach (XElement secondLevelElements in doc.Root!.Elements()) {

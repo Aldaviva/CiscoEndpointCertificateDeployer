@@ -17,7 +17,7 @@ public partial class CsClientWriter {
         await icommandsWriter.WriteAsync($"""
             {FILE_HEADER}
 
-            using {NAMESPACE}.Enums;
+            using {NAMESPACE}.Data;
             using System.CodeDom.Compiler;
             
             namespace {NAMESPACE};
@@ -57,15 +57,17 @@ public partial class CsClientWriter {
         await commandsWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Enums;
+            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
             namespace {{NAMESPACE}};
 
             {{GENERATED_ATTRIBUTE}}
-            public class Commands: {{string.Join(", ", interfaceTree.Keys)}} {
+            internal class Commands: {{string.Join(", ", interfaceTree.Keys)}} {
 
-                private IXapiTransport transport;
+                private readonly IXapiTransport transport;
             
             
             """);

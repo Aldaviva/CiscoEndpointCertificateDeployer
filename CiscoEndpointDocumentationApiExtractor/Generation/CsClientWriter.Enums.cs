@@ -11,10 +11,12 @@ public partial class CsClientWriter {
 
     private static async Task writeEnums(ExtractedDocumentation documentation) {
         await using StreamWriter enumsWriter = openFileStream("Data\\Enums.cs");
-        await using StreamWriter enumSerializerWriter = openFileStream("Data\\Serialization\\EnumSerializer.cs");
+        await using StreamWriter enumSerializerWriter = openFileStream("Serialization\\EnumSerializer.cs");
 
         await enumsWriter.WriteAsync($"""
             {FILE_HEADER}
+
+            using System.CodeDom.Compiler;
 
             namespace {NAMESPACE}.Data;
 
@@ -87,9 +89,10 @@ public partial class CsClientWriter {
         await enumSerializerWriter.WriteAsync($$"""
             {{FILE_HEADER}}
             
+            using {{NAMESPACE}}.Data;
             using System.CodeDom.Compiler;
             
-            namespace {{NAMESPACE}}.Data.Serialization;
+            namespace {{NAMESPACE}}.Serialization;
 
             {{GENERATED_ATTRIBUTE}}
             internal static class EnumSerializer {

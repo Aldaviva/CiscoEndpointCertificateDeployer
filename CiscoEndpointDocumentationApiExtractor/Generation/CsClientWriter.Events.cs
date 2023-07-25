@@ -12,7 +12,7 @@ public partial class CsClientWriter {
         await using StreamWriter eventWriter             = openFileStream("Events.cs");
         await using StreamWriter ieventWriter            = openFileStream("IEvents.cs");
         await using StreamWriter eventDataWriter         = openFileStream("Data\\Events.cs");
-        await using StreamWriter eventDeserializerWriter = openFileStream("Data\\Serialization\\EventDeserializer.cs");
+        await using StreamWriter eventDeserializerWriter = openFileStream("Serialization\\EventDeserializer.cs");
 
         IDictionary<string, ISet<InterfaceChild<DocXEvent>>> interfaceTree = generateInterfaceTree(documentation.events);
 
@@ -38,7 +38,7 @@ public partial class CsClientWriter {
                                 /// <para><c>{string.Join(' ', xEvent.name)}</c></para>
                                 /// <para>Fired when the event is received from the device.</para>
                                 /// </summary>
-                                {generateEventSignature(xEvent, true)};
+                                {generateEventSignature(xEvent, true).signature};
 
 
                             """);
@@ -66,11 +66,12 @@ public partial class CsClientWriter {
         await eventDeserializerWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
+            using {{NAMESPACE}}.Data;
             using Newtonsoft.Json.Linq;
             using System.CodeDom.Compiler;
             using System.Collections.ObjectModel;
 
-            namespace {{NAMESPACE}}.Data.Serialization;
+            namespace {{NAMESPACE}}.Serialization;
 
             {{GENERATED_ATTRIBUTE}}
             internal static class EventDeserializer {
@@ -86,13 +87,13 @@ public partial class CsClientWriter {
         Stack<IEventParent> eventClassesToGenerate = new(documentation.events.Where(xEvent => xEvent.children.Any()));
 
         while (eventClassesToGenerate.TryPop(out IEventParent? eventClassToGenerate)) {
-            await writeEventParent(eventClassToGenerate);
+            await writeEventDataClass(eventClassToGenerate);
             await writeEventDeserializer(eventClassToGenerate);
         }
 
         await eventDeserializerWriter.WriteAsync("    }\r\n\r\n}");
 
-        async Task writeEventParent(IEventParent eventParent) {
+        async Task writeEventDataClass(IEventParent eventParent) {
             await eventDataWriter.WriteAsync($"{GENERATED_ATTRIBUTE}\r\npublic class {generateEventDataClassName(eventParent)} {{\r\n\r\n");
 
             foreach (EventChild eventChild in eventParent.children) {
@@ -152,11 +153,52 @@ public partial class CsClientWriter {
 
                 """);
         }
+
+        await eventWriter.WriteAsync($$"""
+            {{FILE_HEADER}}
+
+            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.Transport;
+            using System.CodeDom.Compiler;
+
+            namespace {{NAMESPACE}};
+
+            {{GENERATED_ATTRIBUTE}}
+            internal class Events: {{string.Join(", ", interfaceTree.Keys)}} {
+
+                private readonly IXapiTransport transport;
+                private readonly FeedbackSubscriber feedbackSubscriber;
+
+
+            """);
+
+        foreach (DocXEvent xEvent in documentation.events) {
+            (string eventSignature, string? returnType) = generateEventSignature(xEvent, false);
+            await eventWriter.WriteAsync($$"""
+                    /// <inheritdoc />
+                    {{eventSignature}} {
+                        add => feedbackSubscriber.Subscribe(new[] { {{string.Join(", ", xEvent.name.Select(s => $"\"{s}\""))}} }, value{{(returnType != null ? $", ValueSerializer.DeserializeEvent<{returnType}>" : "")}}).Wait();
+                        remove => feedbackSubscriber.Unsubscribe(value).Wait();
+                    }
+
+
+                """
+            );
+        }
+
+        foreach (KeyValuePair<string, ISet<InterfaceChild<DocXEvent>>> interfaceNode in interfaceTree) {
+            foreach (Subinterface<DocXEvent> subinterface in interfaceNode.Value.OfType<Subinterface<DocXEvent>>()) {
+                await eventWriter.WriteAsync($"    {subinterface.interfaceName} {interfaceNode.Key}.{subinterface.getterName} => this;\r\n");
+            }
+        }
+
+        await eventWriter.WriteAsync("}");
     }
 
-    private static string generateEventSignature(DocXEvent xEvent, bool isInterfaceEvent) {
+    private static (string signature, string? returnType) generateEventSignature(DocXEvent xEvent, bool isInterfaceEvent) {
         string? payloadType = xEvent.children.Any() ? generateEventDataClassName(xEvent) : null;
-        return $"event FeedbackCallback{(payloadType != null ? $"<{payloadType}>" : "")} {(isInterfaceEvent ? "" : getInterfaceName(xEvent) + '.')}{xEvent.nameWithoutBrackets.Last()}";
+        return ($"event FeedbackCallback{(payloadType != null ? $"<{payloadType}>" : "")} {(isInterfaceEvent ? "" : getInterfaceName(xEvent) + '.')}{xEvent.nameWithoutBrackets.Last()}", payloadType);
     }
 
     private static string generateEventDataClassName(IPathNamed c) {

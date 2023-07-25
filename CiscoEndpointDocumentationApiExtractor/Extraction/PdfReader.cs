@@ -130,8 +130,13 @@ public static class PdfReader {
     public static void parsePdf(string filename, ExtractedDocumentation xapi) {
         using PdfDocument pdf = PdfDocument.Open(filename);
 
+        Console.WriteLine("Parsing xConfiguration section of PDF");
         parseSection(pdf, xapi.configurations);
+
+        Console.WriteLine("Parsing xCommand section of PDF");
         parseSection(pdf, xapi.commands);
+
+        Console.WriteLine("Parsing xStatus section of PDF");
         parseSection(pdf, xapi.statuses);
     }
 

@@ -1,9 +1,9 @@
-﻿namespace CSxAPI;
+﻿namespace CSxAPI.Transport;
 
 public interface IXapiTransport: IDisposable, IAsyncDisposable {
 
-    string Hostname { get; }
-    string Username { get; }
+    public string Hostname { get; }
+    public string Username { get; }
 
     Task<T> GetConfigurationOrStatus<T>(string[] path);
 

@@ -9,8 +9,8 @@ namespace CiscoEndpointDocumentationApiExtractor.Generation;
 public partial class CsClientWriter {
 
     private static async Task writeConfiguration(ExtractedDocumentation documentation) {
-        await using StreamWriter configurationWriter  = openFileStream("Configuration.cs");
-        await using StreamWriter iconfigurationWriter = openFileStream("IConfiguration.cs");
+        await using StreamWriter configurationWriter  = openFileStream("Configurations.cs");
+        await using StreamWriter iconfigurationWriter = openFileStream("IConfigurations.cs");
 
         IDictionary<string, ISet<InterfaceChild<DocXConfiguration>>> interfaceTree = generateInterfaceTree(documentation.configurations);
 
@@ -72,16 +72,18 @@ public partial class CsClientWriter {
         await configurationWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Enums;
+            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
             namespace {{NAMESPACE}};
 
             {{GENERATED_ATTRIBUTE}}
-            public class Configuration: {{string.Join(", ", interfaceTree.Keys)}} {
+            internal class Configuration: {{string.Join(", ", interfaceTree.Keys)}} {
 
-                private IXapiTransport transport;
-                private FeedbackSubscriber feedbackSubscriber;
+                private readonly IXapiTransport transport;
+                private readonly FeedbackSubscriber feedbackSubscriber;
             
             
             """);

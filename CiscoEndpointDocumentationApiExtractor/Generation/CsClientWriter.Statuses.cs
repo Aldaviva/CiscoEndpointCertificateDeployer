@@ -9,8 +9,8 @@ namespace CiscoEndpointDocumentationApiExtractor.Generation;
 public partial class CsClientWriter {
 
     private static async Task writeStatuses(ExtractedDocumentation documentation) {
-        await using StreamWriter statusWriter  = openFileStream("Status.cs");
-        await using StreamWriter istatusWriter = openFileStream("IStatus.cs");
+        await using StreamWriter statusWriter  = openFileStream("Statuses.cs");
+        await using StreamWriter istatusWriter = openFileStream("IStatuses.cs");
 
         IDictionary<string, ISet<InterfaceChild<DocXStatus>>> interfaceTree = generateInterfaceTree(documentation.statuses);
 
@@ -64,16 +64,18 @@ public partial class CsClientWriter {
         await statusWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Enums;
+            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
             namespace {{NAMESPACE}};
 
             {{GENERATED_ATTRIBUTE}}
-            public class Status: {{string.Join(", ", interfaceTree.Keys)}} {
+            internal class Status: {{string.Join(", ", interfaceTree.Keys)}} {
 
-                private IXapiTransport transport;
-                private FeedbackSubscriber feedbackSubscriber;
+                private readonly IXapiTransport transport;
+                private readonly FeedbackSubscriber feedbackSubscriber;
 
 
             """);

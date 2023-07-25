@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using CSxAPI.Transport;
+using Newtonsoft.Json.Linq;
 
 namespace CSxAPI;
 
@@ -17,6 +19,12 @@ internal class FeedbackSubscriber {
     public async Task Subscribe<TSerialized, TDeserialized>(IEnumerable<string> path, FeedbackCallback<TDeserialized> callback, Func<TSerialized, TDeserialized> deserialize,
                                                             bool                notifyCurrentValue = false) {
         long subscriptionId = await _transport.Subscribe<TSerialized>(path, payload => callback(deserialize(payload)), notifyCurrentValue).ConfigureAwait(false);
+        _subscribers[callback] = subscriptionId;
+    }
+
+    public async Task Subscribe<TDeserialized>(IEnumerable<string> path, FeedbackCallback<TDeserialized> callback, Func<JObject, TDeserialized> deserialize,
+                                                            bool                notifyCurrentValue = false) {
+        long subscriptionId = await _transport.Subscribe(path, payload => callback(deserialize(payload)), notifyCurrentValue).ConfigureAwait(false);
         _subscribers[callback] = subscriptionId;
     }
 
