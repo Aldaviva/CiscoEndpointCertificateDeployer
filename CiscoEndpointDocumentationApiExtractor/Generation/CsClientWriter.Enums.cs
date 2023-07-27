@@ -7,7 +7,7 @@ using CiscoEndpointDocumentationApiExtractor.Extraction;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
-public partial class CsClientWriter {
+public static partial class CsClientWriter {
 
     private static async Task writeEnums(ExtractedDocumentation documentation) {
         await using StreamWriter enumsWriter = openFileStream("Data\\Enums.cs");

@@ -9,7 +9,7 @@ using CiscoEndpointDocumentationApiExtractor.Extraction;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
-public partial class CsClientWriter {
+public static partial class CsClientWriter {
 
     private const string GENERATED_DIR = @"..\..\..\..\CSxAPI\Generated";
     private const string NAMESPACE     = "CSxAPI";

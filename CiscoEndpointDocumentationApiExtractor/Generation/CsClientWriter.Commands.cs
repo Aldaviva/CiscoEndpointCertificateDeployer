@@ -6,7 +6,7 @@ using CiscoEndpointDocumentationApiExtractor.Extraction;
 
 namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
-public partial class CsClientWriter {
+public static partial class CsClientWriter {
 
     private static async Task writeCommands(ExtractedDocumentation documentation) {
         await using StreamWriter icommandsWriter = openFileStream("ICommands.cs");

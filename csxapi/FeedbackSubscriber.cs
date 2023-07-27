@@ -47,5 +47,6 @@ internal class FeedbackSubscriber {
 
 }
 
+//TODO maybe put these in a child namespace to keep the top-level one clean
 public delegate void FeedbackCallback();
 public delegate void FeedbackCallback<in T>(T newValue);

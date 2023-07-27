@@ -13,7 +13,7 @@ namespace CiscoEndpointDocumentationApiExtractor.Extraction;
 
 internal class Program {
 
-    private const string PDF_FILENAME       = @"..\..\..\Documentation\11.1.pdf";
+    private const string PDF_FILENAME       = @"..\..\..\Documentation\11.5.pdf";
     private const string EVENT_XML_FILENAME = @"..\..\..\Documentation\event_11.5.xml";
 
     public static async Task Main(string[] args) {
@@ -34,11 +34,12 @@ internal class Program {
     private static void Main2(string[] args) {
         using PdfDocument pdf = PdfDocument.Open(PDF_FILENAME);
 
-        Page page = pdf.GetPage(62);
+        Page page           = pdf.GetPage(59);
+        bool leftSideOfPage = false;
 
         IWordExtractor wordExtractor = DefaultWordExtractor.Instance;
         IReadOnlyList<Letter> lettersWithUnfuckedQuotationMarks = page.Letters
-            .Where(letter => PdfReader.isTextOnHalfOfPage(letter, page, true))
+            .Where(letter => PdfReader.isTextOnHalfOfPage(letter, page, leftSideOfPage))
             /*.Select(letter => letter switch {
                 { Value: "\"", PointSize: 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT") => new Letter(
                     letter.Value,

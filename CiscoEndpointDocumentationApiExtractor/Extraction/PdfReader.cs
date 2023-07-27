@@ -129,15 +129,22 @@ public static class PdfReader {
 
     public static void parsePdf(string filename, ExtractedDocumentation xapi) {
         using PdfDocument pdf = PdfDocument.Open(filename);
+        try {
+            Console.WriteLine("Parsing xConfiguration section of PDF");
+            parseSection(pdf, xapi.configurations);
 
-        Console.WriteLine("Parsing xConfiguration section of PDF");
-        parseSection(pdf, xapi.configurations);
+            Console.WriteLine("Parsing xCommand section of PDF");
+            parseSection(pdf, xapi.commands);
 
-        Console.WriteLine("Parsing xCommand section of PDF");
-        parseSection(pdf, xapi.commands);
-
-        Console.WriteLine("Parsing xStatus section of PDF");
-        parseSection(pdf, xapi.statuses);
+            Console.WriteLine("Parsing xStatus section of PDF");
+            parseSection(pdf, xapi.statuses);
+        } catch (ParsingException e) {
+            Letter firstLetter = getFirstNonQuotationMarkLetter(e.word.Letters);
+            Console.WriteLine($"Failed to parse page {e.page.Number}: {e.Message} (word: {e.word.Text}, character style: {e.characterStyle}, parser state: {e.state}, position: " +
+                $"({firstLetter.StartBaseLine.X / DPI:N}\", {(e.page.Height - firstLetter.StartBaseLine.Y) / DPI:N}\"))");
+            Console.WriteLine($"Font: {firstLetter.PointSize:N2}pt {firstLetter.FontName}");
+            throw;
+        }
     }
 
     private static void parseSection<T>(PdfDocument pdf, ICollection<T> xapiDestinationCollection) where T: AbstractCommand, new() {
@@ -816,15 +823,15 @@ public static class PdfReader {
 
     internal static CharacterStyle getCharacterStyle(Word word) {
         return getFirstNonQuotationMarkLetter(word.Letters) switch {
-            { PointSize: 16.0 }                                                                                                          => CharacterStyle.METHOD_FAMILY_HEADING,
-            { PointSize: 10.0 }                                                                                                          => CharacterStyle.METHOD_NAME_HEADING,
-            { FontName: var fontName, Color: var color } when fontName.EndsWith("CiscoSans-Oblique") && color.Equals(PRODUCT_NAME_COLOR) => CharacterStyle.PRODUCT_NAME,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans")                                               => CharacterStyle.USAGE_HEADING,
-            { PointSize: 8.8 or 9.6, FontName: var fontName } when fontName.EndsWith("CourierNewPSMT")                                   => CharacterStyle.USAGE_EXAMPLE,
-            { PointSize: 8.8, FontName: var fontName } when fontName.EndsWith("CourierNewPS-ItalicMT")                                   => CharacterStyle.PARAMETER_NAME,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-ExtraLightOblique")                             => CharacterStyle.VALUESPACE_OR_DISCLAIMER,
-            { PointSize: 8.0, FontName: var fontName } when fontName.EndsWith("CiscoSans-Oblique")                                       => CharacterStyle.VALUESPACE_TERM,
-            _                                                                                                                            => CharacterStyle.BODY
+            { PointSize: 16.0 }                                                                                                  => CharacterStyle.METHOD_FAMILY_HEADING,
+            { PointSize: 10.0 }                                                                                                  => CharacterStyle.METHOD_NAME_HEADING,
+            { FontName: var font, Color: var color } when font.EndsWith("CiscoSansTT-Oblique") && color.Equals(PRODUCT_NAME_COLOR) => CharacterStyle.PRODUCT_NAME,
+            { PointSize: 8.0, FontName: var font } when font.EndsWith("CiscoSansTT")                                               => CharacterStyle.USAGE_HEADING,
+            { PointSize: 8.8 or 9.6, FontName: var font } when font.EndsWith("CourierNewPSMT")                                   => CharacterStyle.USAGE_EXAMPLE,
+            { PointSize: 8.8, FontName: var font } when font.EndsWith("CourierNewPS-ItalicMT")                                   => CharacterStyle.PARAMETER_NAME,
+            { PointSize: 8.0, FontName: var font } when font.EndsWith("CiscoSansTTLight-Oblique")                             => CharacterStyle.VALUESPACE_OR_DISCLAIMER,
+            { PointSize: 8.0, FontName: var font } when font.EndsWith("CiscoSansTT-Oblique")                                       => CharacterStyle.VALUESPACE_TERM,
+            _                                                                                                                    => CharacterStyle.BODY
         };
     }
 
@@ -853,32 +860,6 @@ public static class PdfReader {
     }
 
 }
-
-/*internal class WordPositionComparer: IComparer<Word> {
-
-    public int Compare(Word? a, Word? b) {
-        if (a is null) {
-            return -1;
-        } else if (b is null) {
-            return 1;
-        }
-
-        Letter aLetter = PdfParser.getFirstNonQuotationMarkLetter(a.Letters);
-        double aY      = aLetter.StartBaseLine.Y;
-
-        Letter bLetter = PdfParser.getFirstNonQuotationMarkLetter(b.Letters);
-        double bY      = bLetter.StartBaseLine.Y;
-
-        if (Math.Abs(aY - bY) >= 0.001) {
-            return -aY.CompareTo(bY); //start from the top of the page, where the Y position is greatest
-        } else {
-            double aX = aLetter.Location.X;
-            double bX = bLetter.Location.X;
-            return aX.CompareTo(bX);
-        }
-    }
-
-}*/
 
 internal class ParsingException: Exception {
 
