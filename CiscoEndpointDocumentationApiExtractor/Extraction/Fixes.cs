@@ -13,6 +13,7 @@ public class Fixes {
     }
 
     public void fix() {
+        // Value space descriptions that depend heavily on the endpoint model are hard to parse, so hard-code the value spaces
         setConfigurationValueSpace("xConfiguration Video Input AirPlay Mode", "Off", "On");
         setConfigurationValueSpace("xConfiguration Video Input Connector [n] CameraControl Mode", "Off", "On");
         setConfigurationValueSpace("xConfiguration Video Input Connector [n] CEC Mode", "Off", "On");
@@ -24,11 +25,16 @@ public class Fixes {
         setConfigurationValueSpace("xConfiguration Video Output Connector [n] HDCPPolicy", "Off", "On");
         setConfigurationValueSpace("xConfiguration Video Output Connector [n] Resolution", "Auto", "1920_1080_50", "1920_1080_60", "1920_1200_50", "1920_1200_60", "2560_1440_60", "3840_2160_30",
             "3840_2160_60");
-
+        
+        // Undocumented enum, so deserialize as a string
+        // xStatus Conference Call [n] Capabilities FarendMessage Mode
+        // xStatus Conference Call [n] Capabilities IxChannel Status
         foreach (DocXStatus naStatus in documentation.statuses.Where(status => status.description == "Not applicable in this release.")) {
             naStatus.returnValueSpace = new StringValueSpace();
         }
 
+        // Multiple path parameters with the same name
+        // xStatus MediaChannels Call [n] Channel [n] Audio Mute
         foreach (DocXStatus multiParameterStatus in documentation.statuses.Where(status => status.arrayIndexParameters.Count >= 2)) {
             int nIndex = 1;
             foreach (IntParameter parameter in multiParameterStatus.arrayIndexParameters.Where(parameter => parameter.name == "n")) {
@@ -40,8 +46,19 @@ public class Fixes {
             }
         }
 
+        // Event body is a number, not an object
+        // xEvent Standby SecondsUntilStandby
+        // xEvent RoomReset SecondsUntilReset
         foreach (DocXEvent xEvent in documentation.events.Where(xEvent => xEvent.children is [{ name: [.., "NameNotUsed"] }])) {
             xEvent.children.Single().name[^1] = "Value";
+        }
+
+        // Zoom commands and configuration
+        foreach (DocXConfiguration xConfiguration in documentation.configurations.Where(xConfiguration => xConfiguration.name[1] == "Zoom").ToList()) {
+            documentation.configurations.Remove(xConfiguration);
+        }
+        foreach (DocXCommand xCommand in documentation.commands.Where(xCommand => xCommand.name[1] == "Zoom").ToList()) {
+            documentation.commands.Remove(xCommand);
         }
     }
 

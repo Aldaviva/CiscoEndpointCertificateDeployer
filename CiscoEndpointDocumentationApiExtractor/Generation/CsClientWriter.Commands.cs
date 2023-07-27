@@ -17,10 +17,10 @@ public static partial class CsClientWriter {
         await icommandsWriter.WriteAsync($"""
             {FILE_HEADER}
 
-            using {NAMESPACE}.Data;
+            using {NAMESPACE}.API.Data;
             using System.CodeDom.Compiler;
             
-            namespace {NAMESPACE};
+            namespace {NAMESPACE}.API;
 
 
             """);
@@ -57,18 +57,21 @@ public static partial class CsClientWriter {
         await commandsWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Data;
-            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.API.Data;
+            using {{NAMESPACE}}.API.Serialization;
             using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
-            namespace {{NAMESPACE}};
+            namespace {{NAMESPACE}}.API;
 
             {{GENERATED_ATTRIBUTE}}
             internal class Commands: {{string.Join(", ", interfaceTree.Keys)}} {
 
                 private readonly IXapiTransport transport;
             
+                public Commands(IXapiTransport transport) {
+                    this.transport = transport;
+                }
             
             """);
 

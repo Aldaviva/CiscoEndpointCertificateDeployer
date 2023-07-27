@@ -11,7 +11,7 @@ namespace CiscoEndpointDocumentationApiExtractor.Generation;
 
 public static partial class CsClientWriter {
 
-    private const string GENERATED_DIR = @"..\..\..\..\CSxAPI\Generated";
+    private const string GENERATED_DIR = @"..\..\..\..\CSxAPI\API\Generated";
     private const string NAMESPACE     = "CSxAPI";
     private const string FILE_HEADER   = "// Generated file";
 

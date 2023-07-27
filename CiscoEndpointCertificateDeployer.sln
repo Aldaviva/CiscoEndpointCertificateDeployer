@@ -19,7 +19,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CiscoWebsocketXapi", "Cisco
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSxAPI", "csxapi\CSxAPI.csproj", "{98FB762B-1267-4BB6-900D-BA1046F874BA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CiscoEndpointDocumentationReleaseIssueCreator", "CiscoEndpointDocumentationReleaseIssueCreator\CiscoEndpointDocumentationReleaseIssueCreator.csproj", "{D7AE2983-A35D-4815-8043-885DBC2AC1F2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CiscoEndpointDocumentationReleaseIssueCreator", "CiscoEndpointDocumentationReleaseIssueCreator\CiscoEndpointDocumentationReleaseIssueCreator.csproj", "{D7AE2983-A35D-4815-8043-885DBC2AC1F2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sample", "Sample\Sample.csproj", "{A968AACB-F5B5-4921-8FF9-7CF58F96DD82}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,6 +65,10 @@ Global
 		{D7AE2983-A35D-4815-8043-885DBC2AC1F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D7AE2983-A35D-4815-8043-885DBC2AC1F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D7AE2983-A35D-4815-8043-885DBC2AC1F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A968AACB-F5B5-4921-8FF9-7CF58F96DD82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A968AACB-F5B5-4921-8FF9-7CF58F96DD82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A968AACB-F5B5-4921-8FF9-7CF58F96DD82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A968AACB-F5B5-4921-8FF9-7CF58F96DD82}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -17,10 +17,10 @@ public static partial class CsClientWriter {
         await iconfigurationWriter.WriteAsync($"""
             {FILE_HEADER}
 
-            using {NAMESPACE}.Data;
+            using {NAMESPACE}.API.Data;
             using System.CodeDom.Compiler;
             
-            namespace {NAMESPACE};
+            namespace {NAMESPACE}.API;
 
 
             """);
@@ -57,6 +57,7 @@ public static partial class CsClientWriter {
                                 /// </summary>
                                 {generateEventSignature(configuration, true)};
 
+
                             """);
                         break;
 
@@ -72,19 +73,23 @@ public static partial class CsClientWriter {
         await configurationWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Data;
-            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.API.Data;
+            using {{NAMESPACE}}.API.Serialization;
             using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
-            namespace {{NAMESPACE}};
+            namespace {{NAMESPACE}}.API;
 
             {{GENERATED_ATTRIBUTE}}
-            internal class Configuration: {{string.Join(", ", interfaceTree.Keys)}} {
+            internal class Configurations: {{string.Join(", ", interfaceTree.Keys)}} {
 
                 private readonly IXapiTransport transport;
                 private readonly FeedbackSubscriber feedbackSubscriber;
             
+                public Configurations(IXapiTransport transport, FeedbackSubscriber feedbackSubscriber) {
+                    this.transport = transport;
+                    this.feedbackSubscriber = feedbackSubscriber;
+                }
             
             """);
 
@@ -94,10 +99,14 @@ public static partial class CsClientWriter {
             string path =
                 $"new[] {{ {string.Join(", ", command.name.Select((s, i) => command.parameters.OfType<IntParameter>().FirstOrDefault(parameter => parameter.indexOfParameterInName == i) is { } pathParameter ? $"{getArgumentName(pathParameter)}.ToString()" : $"\"{s}\""))} }}";
 
+            // Disallow showing Join Zoom button, but still allow it to be hidden, queried, and notified
+            string deserializedExpression = command.name.SequenceEqual(new[] { "xConfiguration", "UserInterface", "Features", "Call", "JoinZoom" })
+                ? getEnumName(command, configurationParameter.name) + ".Hidden" : getArgumentName(configurationParameter);
+
             await configurationWriter.WriteAsync($$"""
                     /// <inheritdoc />
                     {{generateMethodSignature(command, true, false).signature}} {
-                        await transport.SetConfiguration({{path}}, ValueSerializer.Serialize({{getArgumentName(configurationParameter)}})).ConfigureAwait(false);
+                        await transport.SetConfiguration({{path}}, ValueSerializer.Serialize({{deserializedExpression}})).ConfigureAwait(false);
                     }
 
                 
@@ -118,8 +127,8 @@ public static partial class CsClientWriter {
             await configurationWriter.WriteAsync($$"""
                     /// <inheritdoc />
                     {{generateEventSignature(command, false)}} {
-                        add => feedbackSubscriber.Subscribe<{{readSerializedType}}, {{getterImplementationMethod.returnType}}>(new[] { {{string.Join(", ", command.name.Where((s, i) => !command.parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i)).Select(s => $"\"{s}\""))}} }, value, serialized => {{generateDeserializerExpression(configurationParameter, command, "serialized")}}).Wait();
-                        remove => feedbackSubscriber.Unsubscribe(value).Wait();
+                        add => feedbackSubscriber.Subscribe<{{readSerializedType}}, {{getterImplementationMethod.returnType}}>(new[] { {{string.Join(", ", command.name.Where((s, i) => !command.parameters.Any(parameter => parameter is IntParameter { indexOfParameterInName: { } paramIndex } && paramIndex == i)).Select(s => $"\"{s}\""))}} }, value, serialized => {{generateDeserializerExpression(configurationParameter, command, "serialized")}}).Wait(feedbackSubscriber.Timeout);
+                        remove => feedbackSubscriber.Unsubscribe(value).Wait(feedbackSubscriber.Timeout);
                     }
 
 
@@ -160,6 +169,5 @@ public static partial class CsClientWriter {
             { type: DataType.ENUM, name: var name } => getEnumName(configuration, name)
         }}> {(isInterfaceEvent ? "" : getInterfaceName(configuration) + '.')}{configuration.nameWithoutBrackets.Last()}Changed";
     }
-
 
 }

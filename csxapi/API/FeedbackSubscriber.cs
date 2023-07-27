@@ -2,17 +2,19 @@
 using CSxAPI.Transport;
 using Newtonsoft.Json.Linq;
 
-namespace CSxAPI;
+namespace CSxAPI.API;
 
 /// <summary>
 /// Keep track of which numeric subscription ID (from Cisco) belongs to which callback (from the library consumer).
 /// </summary>
 internal class FeedbackSubscriber {
 
-    private readonly WebSocketXapi                      _transport;
+    private readonly IWebSocketXapi                     _transport;
     private readonly ConcurrentDictionary<object, long> _subscribers = new(); // key is FeedbackCallback<T>
 
-    public FeedbackSubscriber(WebSocketXapi transport) {
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(3);
+
+    public FeedbackSubscriber(IWebSocketXapi transport) {
         _transport = transport;
     }
 
@@ -23,7 +25,7 @@ internal class FeedbackSubscriber {
     }
 
     public async Task Subscribe<TDeserialized>(IEnumerable<string> path, FeedbackCallback<TDeserialized> callback, Func<JObject, TDeserialized> deserialize,
-                                                            bool                notifyCurrentValue = false) {
+                                               bool                notifyCurrentValue = false) {
         long subscriptionId = await _transport.Subscribe(path, payload => callback(deserialize(payload)), notifyCurrentValue).ConfigureAwait(false);
         _subscribers[callback] = subscriptionId;
     }
@@ -47,6 +49,5 @@ internal class FeedbackSubscriber {
 
 }
 
-//TODO maybe put these in a child namespace to keep the top-level one clean
 public delegate void FeedbackCallback();
 public delegate void FeedbackCallback<in T>(T newValue);

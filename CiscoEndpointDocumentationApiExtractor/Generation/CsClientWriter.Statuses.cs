@@ -17,10 +17,10 @@ public static partial class CsClientWriter {
         await istatusWriter.WriteAsync($"""
             {FILE_HEADER}
 
-            using {NAMESPACE}.Data;
+            using {NAMESPACE}.API.Data;
             using System.CodeDom.Compiler;
             
-            namespace {NAMESPACE};
+            namespace {NAMESPACE}.API;
 
 
             """);
@@ -64,19 +64,23 @@ public static partial class CsClientWriter {
         await statusWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Data;
-            using {{NAMESPACE}}.Serialization;
+            using {{NAMESPACE}}.API.Data;
+            using {{NAMESPACE}}.API.Serialization;
             using {{NAMESPACE}}.Transport;
             using System.CodeDom.Compiler;
 
-            namespace {{NAMESPACE}};
+            namespace {{NAMESPACE}}.API;
 
             {{GENERATED_ATTRIBUTE}}
-            internal class Status: {{string.Join(", ", interfaceTree.Keys)}} {
+            internal class Statuses: {{string.Join(", ", interfaceTree.Keys)}} {
 
                 private readonly IXapiTransport transport;
                 private readonly FeedbackSubscriber feedbackSubscriber;
 
+                public Statuses(IXapiTransport transport, FeedbackSubscriber feedbackSubscriber) {
+                    this.transport = transport;
+                    this.feedbackSubscriber = feedbackSubscriber;
+                }
 
             """);
 
@@ -102,7 +106,7 @@ public static partial class CsClientWriter {
                     /// <inheritdoc />
                     {{eventSignature}} {
                         add => feedbackSubscriber.Subscribe<{{serializedType}}, {{getterImplementationMethod.returnType}}>(new[] { {{string.Join(", ", xStatus.name.Where((s, i) => !xStatus.arrayIndexParameters.Any(parameter => parameter is { indexOfParameterInName: { } paramIndex } && paramIndex == i)).Select(s => $"\"{s}\""))}} }, value, serialized => {{generateDeserializerExpression(xStatus, "serialized")}}).Wait();
-                        remove => feedbackSubscriber.Unsubscribe(value).Wait();
+                        remove => feedbackSubscriber.Unsubscribe(value).Wait(feedbackSubscriber.Timeout);
                     }
 
 

@@ -19,10 +19,10 @@ public static partial class CsClientWriter {
         await ieventWriter.WriteAsync($"""
             {FILE_HEADER}
 
-            using {NAMESPACE}.Data;
+            using {NAMESPACE}.API.Data;
             using System.CodeDom.Compiler;
 
-            namespace {NAMESPACE};
+            namespace {NAMESPACE}.API;
 
 
             """);
@@ -58,7 +58,7 @@ public static partial class CsClientWriter {
 
             using System.CodeDom.Compiler;
 
-            namespace {NAMESPACE}.Data;
+            namespace {NAMESPACE}.API.Data;
 
 
             """);
@@ -66,12 +66,12 @@ public static partial class CsClientWriter {
         await eventDeserializerWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.API.Data;
             using Newtonsoft.Json.Linq;
             using System.CodeDom.Compiler;
             using System.Collections.ObjectModel;
 
-            namespace {{NAMESPACE}}.Serialization;
+            namespace {{NAMESPACE}}.API.Serialization;
 
             {{GENERATED_ATTRIBUTE}}
             internal static class EventDeserializer {
@@ -157,19 +157,20 @@ public static partial class CsClientWriter {
         await eventWriter.WriteAsync($$"""
             {{FILE_HEADER}}
 
-            using {{NAMESPACE}}.Data;
-            using {{NAMESPACE}}.Serialization;
-            using {{NAMESPACE}}.Transport;
+            using {{NAMESPACE}}.API.Data;
+            using {{NAMESPACE}}.API.Serialization;
             using System.CodeDom.Compiler;
 
-            namespace {{NAMESPACE}};
+            namespace {{NAMESPACE}}.API;
 
             {{GENERATED_ATTRIBUTE}}
             internal class Events: {{string.Join(", ", interfaceTree.Keys)}} {
 
-                private readonly IXapiTransport transport;
                 private readonly FeedbackSubscriber feedbackSubscriber;
 
+                public Events(FeedbackSubscriber feedbackSubscriber) {
+                    this.feedbackSubscriber = feedbackSubscriber;
+                }
 
             """);
 
@@ -178,8 +179,8 @@ public static partial class CsClientWriter {
             await eventWriter.WriteAsync($$"""
                     /// <inheritdoc />
                     {{eventSignature}} {
-                        add => feedbackSubscriber.Subscribe(new[] { {{string.Join(", ", xEvent.name.Select(s => $"\"{s}\""))}} }, value{{(returnType != null ? $", ValueSerializer.DeserializeEvent<{returnType}>" : "")}}).Wait();
-                        remove => feedbackSubscriber.Unsubscribe(value).Wait();
+                        add => feedbackSubscriber.Subscribe(new[] { {{string.Join(", ", xEvent.name.Select(s => $"\"{s}\""))}} }, value{{(returnType != null ? $", ValueSerializer.DeserializeEvent<{returnType}>" : "")}}).Wait(feedbackSubscriber.Timeout);
+                        remove => feedbackSubscriber.Unsubscribe(value).Wait(feedbackSubscriber.Timeout);
                     }
 
 

@@ -38,4 +38,9 @@ internal static class Extensions {
         return (T) xmlSerializer.Deserialize(inputStream)!;
     }
 
+    public static IDictionary<TKey, TValue> Compact<TKey, TValue>(this IDictionary<TKey, TValue?> dictionary) where TKey: notnull where TValue: class {
+        return dictionary.Where(entry => entry.Value != null)
+            .ToDictionary(entry => entry.Key, entry => entry.Value!);
+    }
+
 }

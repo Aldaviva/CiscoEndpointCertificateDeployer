@@ -18,8 +18,7 @@ public static partial class CsClientWriter {
 
             using System.CodeDom.Compiler;
 
-            namespace {NAMESPACE}.Data;
-
+            namespace {NAMESPACE}.API.Data;
 
             """);
 
@@ -89,10 +88,10 @@ public static partial class CsClientWriter {
         await enumSerializerWriter.WriteAsync($$"""
             {{FILE_HEADER}}
             
-            using {{NAMESPACE}}.Data;
+            using {{NAMESPACE}}.API.Data;
             using System.CodeDom.Compiler;
             
-            namespace {{NAMESPACE}}.Serialization;
+            namespace {{NAMESPACE}}.API.Serialization;
 
             {{GENERATED_ATTRIBUTE}}
             internal static class EnumSerializer {

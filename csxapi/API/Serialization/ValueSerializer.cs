@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json.Linq;
 
-namespace CSxAPI.Serialization;
+namespace CSxAPI.API.Serialization;
 
 internal static class ValueSerializer {
 
