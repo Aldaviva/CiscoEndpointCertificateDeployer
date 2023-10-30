@@ -7,6 +7,7 @@ Automatically upload and activate PFX certificate and private key to a Cisco vid
 
 1. [Requirements](#requirements)
 1. [Usage](#usage)
+1. [Result](#result)
 1. [Let's Encrypt](#lets-encrypt)
 
 <!-- /MarkdownTOC -->
@@ -48,6 +49,13 @@ CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUserna
 ```bat
 "C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.exe" "C:\ProgramData\certify\assets\myendpoint.mycompany.com\20210817_abcdefgh.pfx" myendpoint.mycompany.com admin CISCO https,sip
 ```
+
+<a id="result"></a>
+## Result
+
+![Security Services screenshot](.github/images/security-services.png)
+
+![Certificate Details screenshot](.github/images/certificate-details.png)
 
 <a id="lets-encrypt"></a>
 ## Let's Encrypt
