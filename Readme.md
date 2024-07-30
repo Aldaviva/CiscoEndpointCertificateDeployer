@@ -1,7 +1,7 @@
 CiscoEndpointCertificateDeployer
 ===
 
-Automatically upload and activate PFX certificate and private key to a Cisco video conferencing endpoint running TC7, CE8, or later software. Useful for Let's Encrypt automation, such as Certify The Web.
+Automatically upload and activate a PFX certificate and private key to a Cisco video conferencing endpoint running TC7, CE8, or later software. Useful for Let's Encrypt automation, such as Certify The Web.
 
 <!-- MarkdownTOC autolink="true" bracket="round" autoanchor="true" levels="2" style="ordered" -->
 
@@ -14,7 +14,7 @@ Automatically upload and activate PFX certificate and private key to a Cisco vid
 
 <a id="requirements"></a>
 ## Requirements
-- [.NET 7 x64 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/7.0) or later
+- [.NET 8 x64 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) or later
 - [Cisco video conferencing endpoint](https://www.cisco.com/c/en/us/products/collaboration-endpoints/collaboration-room-endpoints/index.html)
     - *Also known as TelePresence, Collaboration Endpoint, Webex Device, room system, and codec*
     - TC, CE, or RoomOS software (tested with TC7, CE9, RoomOS 10, and RoomOS 11)
