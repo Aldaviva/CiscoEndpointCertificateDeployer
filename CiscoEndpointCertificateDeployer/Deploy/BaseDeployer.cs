@@ -8,11 +8,21 @@ using CiscoEndpointCertificateDeployer.Exceptions;
 
 namespace CiscoEndpointCertificateDeployer.Deploy;
 
-public abstract class BaseDeployer: Deployer {
+public abstract class BaseDeployer(Endpoint endpoint): Deployer {
 
-    protected readonly Endpoint   endpoint;
-    protected readonly HttpClient httpClient;
-    protected readonly Uri        endpointBaseUri;
+    protected readonly Endpoint   endpoint        = endpoint;
+    protected readonly Uri        endpointBaseUri = new UriBuilder("https", endpoint.host, 443).Uri;
+    protected readonly HttpClient httpClient      = new(new SocketsHttpHandler {
+        Credentials       = new NetworkCredential(endpoint.username, endpoint.password),
+        PreAuthenticate   = false,
+        CookieContainer   = new CookieContainer(),
+        AllowAutoRedirect = false,
+        //proxy messes up HEAD checks to see if HTTP server is still up, because Fiddler will respond with an HTML error message when there's an upstream SocketException
+        SslOptions = new SslClientAuthenticationOptions {
+            RemoteCertificateValidationCallback = delegate { return true; },
+            EnabledSslProtocols                 = SslProtocols.Tls12 | SslProtocols.Tls13
+        }
+    });
 
     protected bool loggedIn { get; set; }
     private volatile bool disposed;
@@ -24,21 +34,7 @@ public abstract class BaseDeployer: Deployer {
     public abstract Task<IEnumerable<CiscoCertificate>> listCertificates();
     public abstract Task deleteCertificate(string certificateFingerprintSha1);
 
-    protected BaseDeployer(Endpoint endpoint) {
-        this.endpoint   = endpoint;
-        endpointBaseUri = new UriBuilder("https", endpoint.host, 443).Uri;
-        httpClient = new HttpClient(new SocketsHttpHandler {
-            Credentials       = new NetworkCredential(endpoint.username, endpoint.password),
-            PreAuthenticate   = false,
-            CookieContainer   = new CookieContainer(),
-            AllowAutoRedirect = false,
-            //proxy messes up HEAD checks to see if HTTP server is still up, because Fiddler will respond with an HTML error message when there's an upstream SocketException
-            SslOptions = new SslClientAuthenticationOptions {
-                RemoteCertificateValidationCallback = delegate { return true; },
-                EnabledSslProtocols                 = SslProtocols.Tls12 | SslProtocols.Tls13
-            }
-        });
-    }
+    //proxy messes up HEAD checks to see if HTTP server is still up, because Fiddler will respond with an HTML error message when there's an upstream SocketException
 
     /// <summary>
     /// <para><c>true</c>:  TC7 and earlier use two different <c>NetworkServices</c> configurations for HTTP and HTTPS</para>
@@ -97,14 +93,13 @@ public abstract class BaseDeployer: Deployer {
     /// <exception cref="CiscoException">if not logged in yet</exception>
     /// <exception cref="ObjectDisposedException">if already disposed</exception>
     protected void ensureLoggedInAndNotDisposed() {
-        if (disposed) {
-            throw new ObjectDisposedException($"{GetType().Name} instance has already been disposed and cannot be reused.");
-        } else if (!loggedIn) {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!loggedIn) {
             throw new CiscoException("Not logged in yet, call BaseDeployer.logIn() first.");
         }
     }
 
-    protected virtual void Dispose(bool disposing) {
+    private void Dispose(bool disposing) {
         if (disposing) {
             disposed = true;
             loggedIn = false;

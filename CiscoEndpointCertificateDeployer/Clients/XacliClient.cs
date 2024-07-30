@@ -7,27 +7,21 @@ using Renci.SshNet.Common;
 
 namespace CiscoEndpointCertificateDeployer.Clients;
 
-public class XacliClient: IDisposable {
+public class XacliClient(Endpoint endpoint): IDisposable {
 
     private const string XACLI_OK = "\r\nOK\r\n";
 
     private static readonly Encoding UTF8_DESERIALIZING = new UTF8Encoding(true, true);
 
-    private Endpoint endpoint { get; }
+    private Endpoint endpoint { get; } = endpoint;
 
     private SshClient? sshClient { get; set; }
     public ShellStream? shell { get; private set; }
 
     private volatile bool disposed;
 
-    public XacliClient(Endpoint endpoint) {
-        this.endpoint = endpoint;
-    }
-
     public void logIn() {
-        if (disposed) {
-            throw new ObjectDisposedException("XacliClient instance has already been disposed and cannot be reused.");
-        }
+        ObjectDisposedException.ThrowIf(disposed, this);
 
         KeyboardInteractiveConnectionInfo keyboardInteractiveConnectionInfo = new(endpoint.host, endpoint.username);
         keyboardInteractiveConnectionInfo.AuthenticationPrompt += (_, eventArgs) => {
@@ -56,7 +50,7 @@ public class XacliClient: IDisposable {
 
     private string expect(string expectation) {
         ensureLoggedInAndNotDisposed();
-        return shell.Expect(expectation);
+        return shell.Expect(expectation) ?? string.Empty;
     }
 
     /*

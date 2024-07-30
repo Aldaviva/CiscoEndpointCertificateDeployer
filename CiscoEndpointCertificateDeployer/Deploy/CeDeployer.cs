@@ -9,11 +9,9 @@ using CiscoEndpointCertificateDeployer.Extensions;
 
 namespace CiscoEndpointCertificateDeployer.Deploy;
 
-public class CeDeployer: BaseDeployer {
+public class CeDeployer(Endpoint endpoint): BaseDeployer(endpoint) {
 
     private readonly Stream stdout = Console.OpenStandardOutput(1024 * 1024);
-
-    public CeDeployer(Endpoint endpoint): base(endpoint) { }
 
     protected override bool isHttpAndHttpsConfigurationSeparate => false;
 
@@ -21,9 +19,7 @@ public class CeDeployer: BaseDeployer {
 
     /// <exception cref="CiscoException">if logging in fails</exception>
     public override async Task logIn() {
-        if (isDisposed) {
-            throw new ObjectDisposedException($"{nameof(CeDeployer)} instance has already been disposed and cannot be reused.");
-        }
+        ObjectDisposedException.ThrowIf(isDisposed, this);
 
         using HttpResponseMessage response = await httpClient.PostAsync(new UriBuilder(endpointBaseUri) { Path = "/xmlapi/session/begin" }.Uri, null!);
 
@@ -61,7 +57,7 @@ public class CeDeployer: BaseDeployer {
     public override async Task activateCertificate(string certificateFingerprintSha1, ServicePurpose servicePurpose) {
         ensureLoggedInAndNotDisposed();
 
-        XDocument command = TXAS.createCommand(new[] { "Command", "Security", "Certificates", "Services", "Activate" }, new Dictionary<string, string> {
+        XDocument command = TXAS.createCommand(["Command", "Security", "Certificates", "Services", "Activate"], new Dictionary<string, string> {
             { "Fingerprint", certificateFingerprintSha1.ToLowerInvariant() },
             { "Purpose", servicePurpose.txasName() }
         });
@@ -78,7 +74,7 @@ public class CeDeployer: BaseDeployer {
     public override async Task<IEnumerable<CiscoCertificate>> listCertificates() {
         ensureLoggedInAndNotDisposed();
 
-        XDocument command = TXAS.createCommand(new[] { "Command", "Security", "Certificates", "Services", "Show" });
+        XDocument command = TXAS.createCommand(["Command", "Security", "Certificates", "Services", "Show"]);
 
         using HttpResponseMessage response = await httpClient.PostAsync(putXml(), new TxasRequestContent(command));
 
@@ -95,7 +91,7 @@ public class CeDeployer: BaseDeployer {
     public override async Task deleteCertificate(string certificateFingerprintSha1) {
         ensureLoggedInAndNotDisposed();
 
-        XDocument command = TXAS.createCommand(new[] { "Command", "Security", "Certificates", "Services", "Delete" }, new Dictionary<string, string> {
+        XDocument command = TXAS.createCommand(["Command", "Security", "Certificates", "Services", "Delete"], new Dictionary<string, string> {
             { "Fingerprint", certificateFingerprintSha1.ToLowerInvariant() },
         });
 

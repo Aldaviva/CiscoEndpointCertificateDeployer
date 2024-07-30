@@ -20,8 +20,7 @@ internal static class MainClass {
         string endpointHost     = args.ElementAt(1);
         string endpointUsername = args.ElementAt(2);
         string endpointPassword = args.ElementAt(3);
-        ISet<ServicePurpose> purposes = args.ElementAtOrDefault(4)?.Split(',').Select(split => Enum.Parse<ServicePurpose>(split, true)).ToHashSet()
-            ?? new HashSet<ServicePurpose> { ServicePurpose.HTTPS };
+        ISet<ServicePurpose> purposes = args.ElementAtOrDefault(4)?.Split(',').Select(split => Enum.Parse<ServicePurpose>(split, true)).ToHashSet() ?? [ServicePurpose.HTTPS];
 
         Endpoint endpoint = new(endpointHost, endpointUsername, endpointPassword);
         await deploy(pfxFilename, endpoint, purposes);
@@ -30,7 +29,6 @@ internal static class MainClass {
     private static async Task deploy(string pfxFilename, Endpoint endpoint, IEnumerable<ServicePurpose> purposes) {
         Deployer deployer = new CeDeployer(endpoint);
         try {
-
             try {
                 try {
                     await deployer.logIn();
@@ -54,13 +52,12 @@ internal static class MainClass {
             }
 
             IEnumerable<CiscoCertificate> certificatesToDelete = (await deployer.listCertificates())
-                .Where(cert => cert is { issuerName: "/C=US/O=Let's Encrypt/CN=R3", usedFor: "" });
+                .Where(cert => cert.issuerName.StartsWith("/C=US/O=Let's Encrypt/") && cert.usedFor == string.Empty);
             foreach (CiscoCertificate certificateToDelete in certificatesToDelete) {
                 await deployer.deleteCertificate(certificateToDelete.fingerprint);
             }
 
             await deployer.restartWebServer();
-
         } finally {
             deployer.Dispose();
         }

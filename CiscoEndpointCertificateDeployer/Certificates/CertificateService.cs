@@ -10,7 +10,7 @@ public static class CertificateService {
     public static (string pem, string fingerprint) convertPfxChainFileToPem(string pfxFilename) {
         string? fingerprint = null;
 
-        X509Certificate2Collection pfxCertificates = new();
+        X509Certificate2Collection pfxCertificates = [];
         pfxCertificates.Import(pfxFilename, null, X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
 
         StringBuilder pemContents = new();

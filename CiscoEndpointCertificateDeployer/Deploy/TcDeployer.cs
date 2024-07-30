@@ -9,7 +9,7 @@ using CiscoEndpointCertificateDeployer.Exceptions;
 
 namespace CiscoEndpointCertificateDeployer.Deploy;
 
-public partial class TcDeployer: BaseDeployer {
+public partial class TcDeployer(Endpoint endpoint): BaseDeployer(endpoint) {
 
     private static readonly Encoding UTF8_SERIALIZING = new UTF8Encoding(false, true);
 
@@ -18,15 +18,11 @@ public partial class TcDeployer: BaseDeployer {
 
     private string? csrfToken { get; set; }
 
-    public TcDeployer(Endpoint endpoint): base(endpoint) { }
-
     protected override bool isHttpAndHttpsConfigurationSeparate => true;
 
     /// <exception cref="CiscoException">if authentication fails</exception>
     public override async Task logIn() {
-        if (isDisposed) {
-            throw new ObjectDisposedException($"{nameof(TcDeployer)} instance has already been disposed and cannot be reused.");
-        }
+        ObjectDisposedException.ThrowIf(isDisposed, this);
 
         FormUrlEncodedContent requestBody = new((IEnumerable<KeyValuePair<string?, string?>>) new Dictionary<string, string> {
             { "username", endpoint.username },
@@ -59,8 +55,8 @@ public partial class TcDeployer: BaseDeployer {
 
         MultipartFormDataContent requestBody = new() {
             { pemContent, "certificate", "ciscocert.pem" },
-            { new ByteArrayContent(Array.Empty<byte>()), "privkey", string.Empty },
-            { new ByteArrayContent(Array.Empty<byte>()), "passphrase" },
+            { new ByteArrayContent([]), "privkey", string.Empty },
+            { new ByteArrayContent([]), "passphrase" },
             { new StringContent(csrfToken ?? "no token", UTF8_SERIALIZING), "token" }
         };
 

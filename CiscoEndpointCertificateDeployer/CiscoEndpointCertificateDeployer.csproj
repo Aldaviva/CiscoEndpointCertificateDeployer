@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net7.0</TargetFramework>
-        <Version>1.1.0</Version>
+        <TargetFramework>net8.0</TargetFramework>
+        <Version>1.2.0</Version>
         <Nullable>enable</Nullable>
         <ImplicitUsings>true</ImplicitUsings>
         <LangVersion>latest</LangVersion>
@@ -11,7 +11,7 @@
         <ApplicationIcon>cisco.ico</ApplicationIcon>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
         <Authors>Ben Hutchison</Authors>
-        <Copyright>© 2023 Ben Hutchison</Copyright>
+        <Copyright>© 2024 Ben Hutchison</Copyright>
         <Product>Cisco Endpoint Certificate Deployer</Product>
         <Company>$(Authors)</Company>
         <FileVersion>$(Version)</FileVersion>
@@ -21,7 +21,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SSH.NET" Version="2020.0.2" />
+        <PackageReference Include="SSH.NET" Version="2024.1.0" />
     </ItemGroup>
 
 </Project>
