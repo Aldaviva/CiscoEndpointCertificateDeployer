@@ -28,13 +28,13 @@ Automatically upload and activate a PFX certificate and private key to a Cisco v
 ## Usage
 
 ```bat
-CiscoEndpointCertificateDeployer.exe certificatePath endpointHost endpointUsername endpointPassword applyToServices
+CiscoEndpointCertificateDeployer.exe certificatePath endpointHostname endpointUsername endpointPassword applyToServices
 ```
 
 <dl>
     <dt><code>certificatePath</code></dt>
     <dd>The absolute filesystem path of a PFX file to upload. It must have been exported with the private key.</dd>
-    <dt><code>endpointHost</code></dt>
+    <dt><code>endpointHostname</code></dt>
     <dd>The hostname (such as the IP address or FQDN) of the endpoint.</dd>
     <dt><code>endpointUsername</code></dt>
     <dd>The username of an account on the endpoint with the Admin role. The factory default for Cisco endpoints is <code>admin</code>.</dd>
@@ -84,7 +84,7 @@ You can use [Certify The Web](https://certifytheweb.com) on a Windows computer t
     |Program/Script|*The absolute path to the [PowerShell script](https://github.com/Aldaviva/CiscoEndpointCertificateDeployer/blob/master/CiscoEndpointCertificateDeployer/CiscoEndpointCertificateDeployer.ps1) included with this program, such as* `C:\Program Files\CiscoEndpointCertificateDeployer\CiscoEndpointCertificateDeployer.ps1`|
     |Pass Result as First Arg|☑|
     |Impersonation LogonType|Service|
-    |Arguments|*Details about your endpoint, in the form* `endpointHostname=myendpoint.mycompany.com;endpointUsername=admin;endpointPassword=CISCO;applyToServices=https,sip`|
+    |Arguments|*Details about your endpoint, in the form of* `endpointHostname=myendpoint.mycompany.com;endpointUsername=admin;endpointPassword=CISCO;applyToServices=https,sip`|
     |Script Timeout Mins.||
     |Launch New Process|☐|
 1. Click the Save button.
