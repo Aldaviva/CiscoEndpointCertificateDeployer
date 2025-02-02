@@ -2,6 +2,19 @@ param($result, $endpointHostname, $endpointUsername, $endpointPassword, $applyTo
 
 $pfxFilename = $result.ManagedItem.CertificatePath
 
-$process = Start-Process -FilePath ".\CiscoEndpointCertificateDeployer.exe" -ArgumentList $pfxFilename, $endpointHostname, $endpointUsername, $endpointPassword, $applyToServices -Wait -PassThru -RedirectStandardOutput c:\ciscocert-out.txt -RedirectStandardError c:\ciscocert-err.txt
+$process = New-Object System.Diagnostics.Process
+$process.StartInfo.FileName = "CiscoEndpointCertificateDeployer.exe"
+$process.StartInfo.Arguments = $pfxFilename, $endpointHostname, $endpointUsername, $endpointPassword, $applyToServices
+$process.StartInfo.UseShellExecute = $false
+$process.StartInfo.RedirectStandardOutput = $true
+$process.StartInfo.CreateNoWindow = $true
+$null = $process.Start()
+ 
+$stdout = $process.StandardOutput.ReadToEnd()
+$process | Wait-Process
 
-exit $process.ExitCode
+if ($process.ExitCode -eq 0) {
+    Write-Output $stdout
+} else {
+    Write-Error "CiscoEndpointCertificateDeployer.exe exited with code $($process.ExitCode): $stdout"
+}
