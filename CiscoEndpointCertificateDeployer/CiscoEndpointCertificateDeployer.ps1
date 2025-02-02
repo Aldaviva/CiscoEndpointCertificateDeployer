@@ -16,5 +16,5 @@ $process | Wait-Process
 if ($process.ExitCode -eq 0) {
     Write-Output $stdout
 } else {
-    Write-Error "CiscoEndpointCertificateDeployer.exe exited with code $($process.ExitCode): $stdout"
+    Write-Error "$($process.StartInfo.FileName) exited with code $($process.ExitCode): $stdout"
 }

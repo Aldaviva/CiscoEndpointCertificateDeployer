@@ -11,8 +11,8 @@ internal static class MainClass {
 
     private static async Task Main(string[] args) {
         if (args.Length < 4) {
-            string selfExeFilename = Process.GetCurrentProcess().ProcessName; //Assembly.GetCallingAssembly().Location fails for single-file EXE deployments
-            Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO https,sip");
+            string selfExeFilename = Path.GetFileName(Environment.ProcessPath!); //Assembly.GetCallingAssembly().Location fails for single-file EXE deployments
+            Console.WriteLine($"usage example:\n\t\"{selfExeFilename}\" \"C:\\certificate.pfx\" 192.168.1.100 admin CISCO https,sip\n\ndocumentation:\n\thttps://github.com/Aldaviva/CiscoEndpointCertificateDeployer#usage");
             return;
         }
 
